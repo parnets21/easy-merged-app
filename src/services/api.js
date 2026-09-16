@@ -11,7 +11,7 @@ import { getToken, removeToken } from '../utils/storage';
 // YOUR CURRENT SERVER IP: 192.168.1.38  (using adb reverse over Wi-Fi → localhost)
 // If network changes, update this line and rebuild the app.
 //
-export const BASE_URL = 'http://localhost:5000/api';
+export const BASE_URL = 'https://ezyenquiry-backend.onrender.com/api';
 
 const TIMEOUT_MS = 20000; // 20s — generous for slow mobile networks
 
