@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import ErrorMessage from '../../components/ErrorMessage';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -234,6 +235,7 @@ function AlertRow({ icon, iconColor, bg, accent, title, sub, onPress }) {
 ============================================================ */
 
 export default function DashboardScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { can } = usePermissions();
 
@@ -318,26 +320,61 @@ export default function DashboardScreen({ navigation }) {
 
   const companyName = user?.company_name || user?.companyName || 'EzyEnquiry';
 
-  const QUICK_ACTIONS = [
-    { icon: 'package-variant',       iconColor: ORANGE,    bg: ORANGE_LT, label: 'Products',      module: 'products',    onPress: () => navigation.navigate('Products') },
-    { icon: 'message-text-outline',  iconColor: '#2563EB', bg: '#EFF6FF', label: 'Enquiries',     module: 'enquiries',   onPress: () => navigation.navigate('Enquiries') },
-    { icon: 'clipboard-list-outline',iconColor: '#0891B2', bg: '#ECFEFF', label: 'Orders',        module: 'orders',      onPress: () => navigation.navigate('OrderList') },
-    { icon: 'account-group-outline', iconColor: '#7C3AED', bg: '#F5F3FF', label: 'Customers',     module: 'customers',   onPress: () => navigation.navigate('CustomerList') },
-    { icon: 'target',                iconColor: '#DB2777', bg: '#FDF2F8', label: 'Leads',         module: 'leads',       onPress: () => navigation.navigate('LeadList') },
-    { icon: 'warehouse',             iconColor: '#0891B2', bg: '#ECFEFF', label: 'Inventory',     module: 'inventory',   onPress: () => navigation.navigate('Inventory') },
-    { icon: 'truck-delivery',        iconColor: '#7C3AED', bg: '#F5F3FF', label: 'Dispatch',      module: 'dispatches',  onPress: () => navigation.navigate('DispatchTracking') },
-    { icon: 'currency-inr',          iconColor: '#059669', bg: '#ECFDF5', label: 'Sales',         module: 'sales',       onPress: () => navigation.navigate('SalesList') },
-    { icon: 'cart-arrow-down',       iconColor: '#DC2626', bg: '#FEF2F2', label: 'Purchase',      module: 'purchases',   onPress: () => navigation.navigate('PurchaseList') },
-    { icon: 'receipt-text-outline',  iconColor: '#DC2626', bg: '#FEF2F2', label: 'Expense',       module: 'expenses',    onPress: () => navigation.navigate('ExpenseList') },
-    { icon: 'chart-line',            iconColor: '#059669', bg: '#ECFDF5', label: 'Profit & Loss', module: 'profit_loss', onPress: () => navigation.navigate('PLDashboard') },
-    { icon: 'file-document-outline', iconColor: ORANGE,    bg: ORANGE_LT, label: 'Invoices',      module: 'invoices',    onPress: () => navigation.navigate('InvoiceList') },
-    { icon: 'account-tie-outline',   iconColor: '#6D28D9', bg: '#F5F3FF', label: 'Staff',         module: 'staff',       onPress: () => navigation.navigate('StaffList') },
-    { icon: 'chart-box-outline',     iconColor: '#2563EB', bg: '#EFF6FF', label: 'Reports',       module: 'reports',     onPress: () => navigation.navigate('ReportCenter') },
-    { icon: 'chart-arc',             iconColor: '#DB2777', bg: '#FDF2F8', label: 'Analytics',     module: 'reports',     onPress: () => navigation.navigate('AnalyticsDashboard') },
-    { icon: 'folder-outline',        iconColor: '#0891B2', bg: '#ECFEFF', label: 'Documents',     module: 'documents',   onPress: () => navigation.navigate('DocumentList') },
+  // Modules grouped into clean, scannable categories (instead of one flat 16-icon grid).
+  const MODULE_GROUPS = [
+    {
+      title: 'Marketplace',
+      items: [
+        { icon: 'package-variant',        iconColor: ORANGE,    bg: ORANGE_LT, label: 'Products',   module: 'products',    onPress: () => navigation.navigate('Products') },
+        { icon: 'message-text-outline',   iconColor: '#2563EB', bg: '#EFF6FF', label: 'Enquiries',  module: 'enquiries',   onPress: () => navigation.navigate('Enquiries') },
+        { icon: 'clipboard-list-outline', iconColor: '#0891B2', bg: '#ECFEFF', label: 'Orders',     module: 'orders',      onPress: () => navigation.navigate('OrderList') },
+        { icon: 'truck-delivery',         iconColor: '#7C3AED', bg: '#F5F3FF', label: 'Dispatch',   module: 'dispatches',  onPress: () => navigation.navigate('DispatchTracking') },
+      ],
+    },
+    {
+      title: 'Inventory & Purchase',
+      items: [
+        { icon: 'warehouse',        iconColor: '#0891B2', bg: '#ECFEFF', label: 'Inventory', module: 'inventory', onPress: () => navigation.navigate('Inventory') },
+        { icon: 'cart-arrow-down',  iconColor: '#DC2626', bg: '#FEF2F2', label: 'Purchase',  module: 'purchases', onPress: () => navigation.navigate('PurchaseList') },
+      ],
+    },
+    {
+      title: 'Finance',
+      items: [
+        { icon: 'currency-inr',          iconColor: '#059669', bg: '#ECFDF5', label: 'Sales',         module: 'sales',       onPress: () => navigation.navigate('SalesList') },
+        { icon: 'file-document-outline', iconColor: ORANGE,    bg: ORANGE_LT, label: 'Invoices',      module: 'invoices',    onPress: () => navigation.navigate('InvoiceList') },
+        { icon: 'receipt-text-outline',  iconColor: '#DC2626', bg: '#FEF2F2', label: 'Expense',       module: 'expenses',    onPress: () => navigation.navigate('ExpenseList') },
+        { icon: 'chart-line',            iconColor: '#059669', bg: '#ECFDF5', label: 'Profit & Loss', module: 'profit_loss', onPress: () => navigation.navigate('PLDashboard') },
+      ],
+    },
+    {
+      title: 'CRM',
+      items: [
+        { icon: 'account-group-outline', iconColor: '#7C3AED', bg: '#F5F3FF', label: 'Customers', module: 'customers', onPress: () => navigation.navigate('CustomerList') },
+        { icon: 'target',                iconColor: '#DB2777', bg: '#FDF2F8', label: 'Leads',     module: 'leads',     onPress: () => navigation.navigate('LeadList') },
+      ],
+    },
+    {
+      title: 'Tools',
+      items: [
+        { icon: 'calculator-variant', iconColor: ORANGE, bg: ORANGE_LT, label: 'Stone Calc', onPress: () => navigation.navigate('StoneCalculation') },
+      ],
+    },
+    {
+      title: 'More',
+      items: [
+        { icon: 'chart-box-outline',   iconColor: '#2563EB', bg: '#EFF6FF', label: 'Reports',   module: 'reports',   onPress: () => navigation.navigate('ReportCenter') },
+        { icon: 'chart-arc',           iconColor: '#DB2777', bg: '#FDF2F8', label: 'Analytics', module: 'reports',   onPress: () => navigation.navigate('AnalyticsDashboard') },
+        { icon: 'account-tie-outline', iconColor: '#6D28D9', bg: '#F5F3FF', label: 'Staff',     module: 'staff',     onPress: () => navigation.navigate('StaffList') },
+        { icon: 'folder-outline',      iconColor: '#0891B2', bg: '#ECFEFF', label: 'Documents', module: 'documents', onPress: () => navigation.navigate('DocumentList') },
+      ],
+    },
   ];
 
-  const visibleActions = QUICK_ACTIONS.filter(a => !a.module || can(a.module));
+  // Keep only items the role can access; drop groups that become empty.
+  const visibleGroups = MODULE_GROUPS
+    .map(g => ({ ...g, items: g.items.filter(a => !a.module || can(a.module)) }))
+    .filter(g => g.items.length > 0);
 
   // Primary quick-add shortcuts (spec §4): Add Product, Reply Enquiry, Create Order, Stock Entry.
   const PRIMARY_ACTIONS = [
@@ -358,7 +395,7 @@ export default function DashboardScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} colors={[ORANGE]} tintColor={ORANGE} />}
       >
         {/* ── HEADER ── */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
           <View style={styles.headerCircle1} />
           <View style={styles.headerCircle2} />
 
@@ -472,17 +509,19 @@ export default function DashboardScreen({ navigation }) {
           </View>
         </View>
 
-        {/* ── QUICK ACTIONS ── */}
-        <View style={styles.block}>
-          <SectionHeader title="All Modules" />
-          <View style={styles.quickCard}>
-            <View style={styles.quickGrid}>
-              {visibleActions.map(action => (
-                <QuickAction key={action.label} {...action} />
-              ))}
+        {/* ── MODULES (grouped, clean) ── */}
+        {visibleGroups.map(group => (
+          <View style={styles.block} key={group.title}>
+            <SectionHeader title={group.title} />
+            <View style={styles.quickCard}>
+              <View style={styles.quickGrid}>
+                {group.items.map(action => (
+                  <QuickAction key={action.label} {...action} />
+                ))}
+              </View>
             </View>
           </View>
-        </View>
+        ))}
 
         {/* ── ENQUIRIES ── */}
         <View style={styles.block}>
@@ -569,7 +608,6 @@ const styles = StyleSheet.create({
   /* ── Header ── */
   header: {
     backgroundColor:   NAVY,
-    paddingTop:        54,
     paddingHorizontal: 20,
     paddingBottom:     74,
     borderBottomLeftRadius:  28,

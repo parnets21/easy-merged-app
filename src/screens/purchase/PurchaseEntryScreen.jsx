@@ -14,20 +14,13 @@ import { purchaseService } from '../../services/purchaseService';
 import { wholesalerProductService } from '../../services/productService';
 import { theme } from '../../utils/theme';
 
-// Buy modes decide how quantity (in the product's unit, e.g. sq ft) is derived.
-const MODES = [
-  { key: 'boxes',  label: 'Tiles (by Box)' },
-  { key: 'sqft',   label: 'Granite (by Size)' },
-  { key: 'direct', label: 'Direct Qty' },
-];
-
 const money = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 
 export default function PurchaseEntryScreen({ route, navigation }) {
   const preset = route?.params?.product || null;   // optional {_id,name,code,sqft_per_box,purchase_price,gst_percent,unit}
 
-  const [mode, setMode] = useState(preset?.sqft_per_box ? 'boxes' : 'direct');
   const [saving, setSaving] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // ── Admin catalog product picker ──
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -55,7 +48,6 @@ export default function PurchaseEntryScreen({ route, navigation }) {
       sqft_per_box: p.sqft_per_box ? String(p.sqft_per_box) : f.sqft_per_box,
     }));
     setSelectedName(p.name || '');
-    if (p.sqft_per_box) setMode('boxes');
     setPickerOpen(false);
     setPickerSearch('');
   };
@@ -83,20 +75,8 @@ export default function PurchaseEntryScreen({ route, navigation }) {
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const numOnly = (v) => v.replace(/[^0-9.]/g, '');
 
-  // Compute quantity (in the product unit — sq ft for tiles/granite) based on mode.
-  const qty = useMemo(() => {
-    if (mode === 'boxes') {
-      const b = parseFloat(form.boxes), s = parseFloat(form.sqft_per_box);
-      if (b > 0 && s > 0) return +(b * s).toFixed(2);
-      return 0;
-    }
-    if (mode === 'sqft') {
-      const L = parseFloat(form.slabL), W = parseFloat(form.slabW), p = parseFloat(form.slabPcs) || 1;
-      if (L > 0 && W > 0) return +(((L * W) / 144) * p).toFixed(2);   // in² → ft²
-      return 0;
-    }
-    return parseFloat(form.directQty) || 0;
-  }, [mode, form.boxes, form.sqft_per_box, form.slabL, form.slabW, form.slabPcs, form.directQty]);
+  // Quantity is entered directly (buy-mode selector removed).
+  const qty = useMemo(() => parseFloat(form.directQty) || 0, [form.directQty]);
 
   const rate = parseFloat(form.rate) || 0;
   const gstPct = parseFloat(form.gst_percent);
@@ -105,8 +85,8 @@ export default function PurchaseEntryScreen({ route, navigation }) {
   const total = amount + gstAmount;
 
   const handleSave = async () => {
+    if (!form.product_id)           { Alert.alert('Required', 'Select a product from the catalog.'); return; }
     if (!form.supplier_name.trim()) { Alert.alert('Required', 'Enter supplier name.'); return; }
-    if (!form.product_name.trim())  { Alert.alert('Required', 'Enter product name.'); return; }
     if (qty <= 0)  { Alert.alert('Required', 'Quantity must be greater than 0.'); return; }
     if (rate <= 0) { Alert.alert('Required', 'Rate must be greater than 0.'); return; }
 
@@ -118,11 +98,7 @@ export default function PurchaseEntryScreen({ route, navigation }) {
       product_name:  form.product_name.trim(),
       qty, rate,
       gst_percent:   isNaN(gstPct) ? 18 : gstPct,
-      notes: [
-        form.notes.trim(),
-        mode === 'boxes'  ? `${form.boxes} box(es) × ${form.sqft_per_box} sqft/box` : '',
-        mode === 'sqft'   ? `${form.slabPcs} pc(s) ${form.slabL}"×${form.slabW}"` : '',
-      ].filter(Boolean).join(' | '),
+      notes: form.notes.trim(),
     };
 
     setSaving(true);
@@ -150,35 +126,37 @@ export default function PurchaseEntryScreen({ route, navigation }) {
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
 
         <View style={styles.card}>
-          {/* Pick from admin catalog */}
-          <Text style={styles.pickLabel}>Select Product from Catalog</Text>
+          {/* Pick from admin catalog — this is the ONLY way to choose a product */}
+          <Text style={styles.pickLabel}>Select Product from Catalog *</Text>
           <TouchableOpacity style={styles.pickBtn} onPress={() => setPickerOpen(true)} activeOpacity={0.8}>
             <Text style={[styles.pickBtnText, !selectedName && styles.pickBtnPlaceholder]} numberOfLines={1}>
               {selectedName || 'Tap to choose an admin product…'}
             </Text>
             <Text style={styles.pickChevron}>▾</Text>
           </TouchableOpacity>
-          <Text style={styles.pickHint}>Or type the product name below to buy a custom item.</Text>
+          {selectedName ? (
+            <Text style={styles.pickSelected} numberOfLines={1}>
+              Selected: {form.product_code ? form.product_code + ' · ' : ''}{selectedName}
+            </Text>
+          ) : (
+            <Text style={styles.pickHint}>Choose a product from the admin catalog to continue.</Text>
+          )}
 
           <FormField label="Supplier Name *" value={form.supplier_name}
             onChangeText={v => set('supplier_name', v)} placeholder="Supplier / vendor name" />
 
-          {/* Purchase date (YYYY-MM-DD) with a Today shortcut */}
+          {/* Purchase date — opens a calendar picker */}
           <Text style={styles.dateLabel}>Purchase Date</Text>
           <View style={styles.dateRow}>
-            <View style={{ flex: 1 }}>
-              <FormField label="" value={form.purchase_date}
-                onChangeText={v => set('purchase_date', v.replace(/[^0-9-]/g, ''))}
-                placeholder="YYYY-MM-DD" maxLength={10} />
-            </View>
+            <TouchableOpacity style={styles.dateInput} onPress={() => setCalendarOpen(true)} activeOpacity={0.8}>
+              <Text style={styles.dateInputText}>{form.purchase_date || 'Select date'}</Text>
+              <Text style={styles.dateInputIcon}>📅</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.todayBtn}
               onPress={() => set('purchase_date', new Date().toISOString().slice(0, 10))} activeOpacity={0.8}>
               <Text style={styles.todayBtnText}>Today</Text>
             </TouchableOpacity>
           </View>
-
-          <FormField label="Product Name *" value={form.product_name}
-            onChangeText={v => set('product_name', v)} placeholder="Item you are buying" />
         </View>
 
         {/* Product picker modal */}
@@ -223,65 +201,17 @@ export default function PurchaseEntryScreen({ route, navigation }) {
           </View>
         </Modal>
 
-        {/* Buy mode */}
-        <Text style={styles.sectionTitle}>How are you buying?</Text>
-        <View style={styles.typeRow}>
-          {MODES.map(m => {
-            const active = mode === m.key;
-            return (
-              <TouchableOpacity key={m.key} style={[styles.typeChip, active && styles.typeChipOn]}
-                onPress={() => setMode(m.key)} activeOpacity={0.85}>
-                <Text style={[styles.typeChipText, active && styles.typeChipTextOn]}>{m.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {/* Calendar picker modal */}
+        <CalendarModal
+          visible={calendarOpen}
+          value={form.purchase_date}
+          onClose={() => setCalendarOpen(false)}
+          onSelect={(d) => { set('purchase_date', d); setCalendarOpen(false); }}
+        />
 
+        {/* Quantity + Rate (buy-mode selector removed — always direct quantity) */}
         <View style={styles.card}>
-          {mode === 'boxes' && (
-            <>
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <FormField label="No. of Boxes" value={form.boxes}
-                    onChangeText={v => set('boxes', numOnly(v))} keyboardType="numeric" placeholder="e.g. 50" />
-                </View>
-                <View style={styles.col}>
-                  <FormField label="Sq Ft / Box" value={form.sqft_per_box}
-                    onChangeText={v => set('sqft_per_box', numOnly(v))} keyboardType="numeric" placeholder="e.g. 16" />
-                </View>
-              </View>
-              <FormField label="Rate (per Sq Ft)" value={form.rate}
-                onChangeText={v => set('rate', numOnly(v))} keyboardType="numeric" placeholder="0" />
-            </>
-          )}
-
-          {mode === 'sqft' && (
-            <>
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <FormField label="Slab Length (in)" value={form.slabL}
-                    onChangeText={v => set('slabL', numOnly(v))} keyboardType="numeric" placeholder="e.g. 96" />
-                </View>
-                <View style={styles.col}>
-                  <FormField label="Slab Width (in)" value={form.slabW}
-                    onChangeText={v => set('slabW', numOnly(v))} keyboardType="numeric" placeholder="e.g. 36" />
-                </View>
-              </View>
-              <View style={styles.row}>
-                <View style={styles.col}>
-                  <FormField label="No. of Pieces" value={form.slabPcs}
-                    onChangeText={v => set('slabPcs', numOnly(v))} keyboardType="numeric" placeholder="1" />
-                </View>
-                <View style={styles.col}>
-                  <FormField label="Rate (per Sq Ft)" value={form.rate}
-                    onChangeText={v => set('rate', numOnly(v))} keyboardType="numeric" placeholder="0" />
-                </View>
-              </View>
-            </>
-          )}
-
-          {mode === 'direct' && (
-            <View style={styles.row}>
+          <View style={styles.row}>
               <View style={styles.col}>
                 <FormField label="Quantity" value={form.directQty}
                   onChangeText={v => set('directQty', numOnly(v))} keyboardType="numeric" placeholder="0" />
@@ -291,7 +221,6 @@ export default function PurchaseEntryScreen({ route, navigation }) {
                   onChangeText={v => set('rate', numOnly(v))} keyboardType="numeric" placeholder="0" />
               </View>
             </View>
-          )}
 
           <FormField label="GST %" value={form.gst_percent}
             onChangeText={v => set('gst_percent', numOnly(v))} keyboardType="numeric" placeholder="18" />
@@ -299,7 +228,7 @@ export default function PurchaseEntryScreen({ route, navigation }) {
 
         {/* Live calculation summary */}
         <View style={styles.summary}>
-          <Row label="Quantity" value={`${qty} ${mode === 'direct' ? '' : 'sq ft'}`} />
+          <Row label="Quantity" value={`${qty}`} />
           <Row label="Rate" value={money(rate)} />
           <Row label="Amount" value={money(amount)} />
           <Row label={`GST (${isNaN(gstPct) ? 18 : gstPct}%)`} value={money(gstAmount)} />
@@ -321,6 +250,96 @@ function Row({ label, value, big }) {
       <Text style={[styles.sumLabel, big && styles.sumLabelBig]}>{label}</Text>
       <Text style={[styles.sumValue, big && styles.sumValueBig]}>{value}</Text>
     </View>
+  );
+}
+
+// ── Lightweight in-app calendar (no native dependency) ──────────
+const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+const pad2 = (n) => String(n).padStart(2, '0');
+const toISO = (y, m, d) => `${y}-${pad2(m + 1)}-${pad2(d)}`;
+
+function CalendarModal({ visible, value, onClose, onSelect }) {
+  // Parse the currently selected date (or fall back to today) to position the view.
+  const parsed = (() => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+    if (m) return { y: +m[1], mo: +m[2] - 1, d: +m[3] };
+    const t = new Date();
+    return { y: t.getFullYear(), mo: t.getMonth(), d: t.getDate() };
+  })();
+
+  const [viewYear, setViewYear] = useState(parsed.y);
+  const [viewMonth, setViewMonth] = useState(parsed.mo);
+
+  // Re-sync the visible month whenever the picker is re-opened.
+  useEffect(() => {
+    if (visible) { setViewYear(parsed.y); setViewMonth(parsed.mo); }
+  }, [visible]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();      // 0=Sun
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const goPrev = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  };
+  const goNext = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  };
+
+  const selISO = value;
+  const today = new Date();
+  const todayISO = toISO(today.getFullYear(), today.getMonth(), today.getDate());
+
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <View style={styles.calOverlay}>
+        <TouchableOpacity style={styles.calDismiss} onPress={onClose} activeOpacity={1} />
+        <View style={styles.calCard}>
+          {/* Month nav */}
+          <View style={styles.calHeader}>
+            <TouchableOpacity onPress={goPrev} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={styles.calNav}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.calTitle}>{MONTHS[viewMonth]} {viewYear}</Text>
+            <TouchableOpacity onPress={goNext} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={styles.calNav}>›</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Weekday labels */}
+          <View style={styles.calWeekRow}>
+            {WEEKDAYS.map(w => <Text key={w} style={styles.calWeekday}>{w}</Text>)}
+          </View>
+
+          {/* Day grid */}
+          <View style={styles.calGrid}>
+            {cells.map((d, i) => {
+              if (d == null) return <View key={`e${i}`} style={styles.calCell} />;
+              const iso = toISO(viewYear, viewMonth, d);
+              const isSel = iso === selISO;
+              const isToday = iso === todayISO;
+              return (
+                <TouchableOpacity key={iso} style={styles.calCell} onPress={() => onSelect(iso)} activeOpacity={0.7}>
+                  <View style={[styles.calDay, isSel && styles.calDaySel, !isSel && isToday && styles.calDayToday]}>
+                    <Text style={[styles.calDayText, isSel && styles.calDayTextSel]}>{d}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <TouchableOpacity style={styles.calClose} onPress={onClose} activeOpacity={0.8}>
+            <Text style={styles.calCloseText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -376,6 +395,34 @@ const styles = StyleSheet.create({
   todayBtn:  { backgroundColor: theme.colors.accentLight, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: theme.colors.accent },
   todayBtnText: { color: theme.colors.accent, fontWeight: '700', fontSize: 13 },
 
+  /* Date input (opens calendar) */
+  dateInput: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 13, backgroundColor: theme.colors.surface,
+  },
+  dateInputText: { fontSize: 14, color: theme.colors.textPrimary, fontWeight: '600' },
+  dateInputIcon: { fontSize: 15, marginLeft: 8 },
+
+  /* Calendar modal */
+  calOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  calDismiss: { ...StyleSheet.absoluteFillObject },
+  calCard: { width: '100%', maxWidth: 360, backgroundColor: '#fff', borderRadius: 18, padding: 16 },
+  calHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  calTitle: { fontSize: 16, fontWeight: '800', color: theme.colors.textPrimary },
+  calNav: { fontSize: 28, color: theme.colors.primary, fontWeight: '700', paddingHorizontal: 12 },
+  calWeekRow: { flexDirection: 'row', marginBottom: 6 },
+  calWeekday: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: theme.colors.textSecondary },
+  calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  calDay: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  calDaySel: { backgroundColor: theme.colors.accent },
+  calDayToday: { borderWidth: 1.5, borderColor: theme.colors.accent },
+  calDayText: { fontSize: 14, color: theme.colors.textPrimary, fontWeight: '600' },
+  calDayTextSel: { color: '#fff', fontWeight: '800' },
+  calClose: { marginTop: 10, alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: theme.colors.background },
+  calCloseText: { fontSize: 14, fontWeight: '700', color: theme.colors.textSecondary },
+
   /* Product picker */
   pickLabel: { fontSize: 13, fontWeight: '600', color: theme.colors.textPrimary, marginBottom: 6 },
   pickBtn: {
@@ -387,6 +434,7 @@ const styles = StyleSheet.create({
   pickBtnPlaceholder: { color: theme.colors.textSecondary, fontWeight: '500' },
   pickChevron: { fontSize: 14, color: theme.colors.accentDark, marginLeft: 8 },
   pickHint: { fontSize: 11.5, color: theme.colors.textSecondary, marginTop: 6, marginBottom: 6 },
+  pickSelected: { fontSize: 12, fontWeight: '700', color: theme.colors.accentDark, marginTop: 6, marginBottom: 6 },
 
   /* Modal */
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

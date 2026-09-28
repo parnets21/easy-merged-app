@@ -6,6 +6,7 @@ import {
   FlatList, RefreshControl, ScrollView, StyleSheet,
   Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon           from '../../components/Icon';
 import EmptyState     from '../../components/EmptyState';
 import ErrorMessage   from '../../components/ErrorMessage';
@@ -53,6 +54,7 @@ const FILTER_TABS = ['All', ...EXPENSE_CATEGORIES.map(c => c.key)];
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ExpenseListScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [expenses,   setExpenses]   = useState([]);
   const [totalAmount, setTotal]     = useState(0);
   const [loading,    setLoading]    = useState(true);
@@ -220,7 +222,7 @@ export default function ExpenseListScreen({ navigation }) {
       )}
 
       {/* ── FAB ────────────────────────────────────────────────────────── */}
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('ExpenseEntry')} activeOpacity={0.88}>
+      <TouchableOpacity style={[styles.fab, { bottom: 22 + insets.bottom }]} onPress={() => navigation.navigate('ExpenseEntry')} activeOpacity={0.88}>
         <Icon name="plus" size={20} color={WHITE} />
         <Text style={styles.fabText}>Add Expense</Text>
       </TouchableOpacity>

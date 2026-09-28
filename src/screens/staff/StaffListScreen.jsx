@@ -9,6 +9,7 @@ import {
   ActivityIndicator, Alert, FlatList, Platform, RefreshControl, StatusBar,
   StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { employeeService, STAFF_ROLES } from '../../services/employeeService';
 import { theme } from '../../utils/theme';
@@ -22,6 +23,7 @@ const roleMeta = (designation = '') => {
 };
 
 export default function StaffListScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -62,8 +64,24 @@ export default function StaffListScreen({ navigation }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.mobile}>{item.mobile || 'No mobile'}</Text>
-          <View style={[styles.badge, { backgroundColor: meta.bg }]}>
-            <Text style={[styles.badgeText, { color: meta.fg }]}>{meta.label}</Text>
+          <View style={styles.tagRow}>
+            <View style={[styles.badge, { backgroundColor: meta.bg }]}>
+              <Text style={[styles.badgeText, { color: meta.fg }]}>{item.role_access || meta.label}</Text>
+            </View>
+            {Number(item.salary) > 0 && (
+              <View style={styles.infoPill}>
+                <Icon name="cash" size={11} color="#059669" />
+                <Text style={styles.infoPillText}>₹{Number(item.salary).toLocaleString('en-IN')}</Text>
+              </View>
+            )}
+            {Array.isArray(item.incentive_slabs) && item.incentive_slabs.length > 0 && (
+              <View style={[styles.infoPill, { backgroundColor: theme.colors.accentLight }]}>
+                <Icon name="chart-line-variant" size={11} color={theme.colors.accent} />
+                <Text style={[styles.infoPillText, { color: theme.colors.accent }]}>
+                  {item.incentive_slabs.length} slab{item.incentive_slabs.length > 1 ? 's' : ''}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
         <TouchableOpacity onPress={() => confirmDelete(item)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -103,7 +121,7 @@ export default function StaffListScreen({ navigation }) {
         />
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('AddStaff')} activeOpacity={0.9}>
+      <TouchableOpacity style={[styles.fab, { bottom: 20 + insets.bottom }]} onPress={() => navigation.navigate('AddStaff')} activeOpacity={0.9}>
         <Icon name="plus" size={20} color="#fff" />
         <Text style={styles.fabText}>Add Staff</Text>
       </TouchableOpacity>
@@ -128,8 +146,11 @@ const styles = StyleSheet.create({
   avatarText: { color: '#fff', fontSize: 18, fontWeight: '800' },
   name: { fontSize: 15, fontWeight: '800', color: theme.colors.textPrimary },
   mobile: { fontSize: 12, color: theme.colors.textSecondary, marginTop: 1 },
-  badge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, marginTop: 5 },
+  tagRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 6 },
+  badge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   badgeText: { fontSize: 10.5, fontWeight: '800' },
+  infoPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#ECFDF5', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8 },
+  infoPillText: { fontSize: 10.5, fontWeight: '800', color: '#059669' },
 
   empty: { alignItems: 'center', paddingTop: 70, gap: 8 },
   emptyTitle: { fontSize: 15, fontWeight: '800', color: theme.colors.textPrimary },

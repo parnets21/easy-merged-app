@@ -27,7 +27,7 @@ export default function RegistrationScreen({ route, navigation }) {
   const [form, setForm] = useState({
     companyName: '', ownerName: '', mobile: prefilledMobile,
     email: '', gstNumber: '', panNumber: '',
-    businessType: '', address: '', city: '', state: '', pincode: '',
+    address: '', city: '', state: '', pincode: '',
   });
   const [errors,  setErrors]  = useState({});
   const [loading, setLoading] = useState(false);
@@ -40,7 +40,6 @@ export default function RegistrationScreen({ route, navigation }) {
   const handleRegister = async () => {
     const required = [
       'companyName','ownerName','mobile','email',
-      'panNumber','businessType',
       'address','city','state','pincode',
     ];
     const newErrors = {};
@@ -51,8 +50,11 @@ export default function RegistrationScreen({ route, navigation }) {
 
     setLoading(true);
     try {
-      // Step 1 — Create company + user
-      await authService.register(form);
+      // Step 1 — Create company + user (backend returns a unique company code).
+      // Business type is no longer collected from the user — default to
+      // 'Wholesaler' so the backend (which still expects the field) accepts it.
+      const regRes     = await authService.register({ ...form, businessType: 'Wholesaler' });
+      const uniqueCode = regRes?.data?.companyCode || regRes?.companyCode || null;
 
       // Step 2 — Send OTP for verification before document upload
       const otpRes = await authService.sendOTP(form.mobile, 'register');
@@ -61,12 +63,14 @@ export default function RegistrationScreen({ route, navigation }) {
       // Save step so app can resume here if closed before docs are uploaded
       await setRegStep('otp', form.mobile);
 
-      // Step 3 — Go to OTP screen; on success it will go to DocumentUpload
+      // Step 3 — Go to OTP screen; on success it will go to DocumentUpload.
+      // Carry the unique code forward so it can be shown to the wholesaler.
       navigation.replace('OTP', {
         mobile:   form.mobile,
         devOtp,
         purpose:  'register',
         nextScreen: 'DocumentUpload',
+        uniqueCode,
       });
     } catch (e) {
       Alert.alert('Registration Failed', e?.message || 'Please check your details and try again.');
@@ -113,8 +117,6 @@ export default function RegistrationScreen({ route, navigation }) {
             onChangeText={v => set('companyName', v)} placeholder="Enter company name" error={errors.companyName} />
           <FormField label="Owner Name *" value={form.ownerName}
             onChangeText={v => set('ownerName', v)} placeholder="Enter owner full name" error={errors.ownerName} />
-          <FormField label="Business Type *" value={form.businessType}
-            onChangeText={v => set('businessType', v)} placeholder="e.g. Wholesale, Distribution" error={errors.businessType} />
 
           <Section color={theme.colors.accent} title="Contact Details" />
           <FormField label="Mobile Number *" value={form.mobile}
@@ -128,7 +130,7 @@ export default function RegistrationScreen({ route, navigation }) {
           <FormField label="GST Number (optional)" value={form.gstNumber}
             onChangeText={v => set('gstNumber', v.toUpperCase())}
             autoCapitalize="characters" placeholder="22AAAAA0000A1Z5" maxLength={15} error={errors.gstNumber} />
-          <FormField label="PAN Number *" value={form.panNumber}
+          <FormField label="PAN Number (optional)" value={form.panNumber}
             onChangeText={v => set('panNumber', v.toUpperCase())}
             autoCapitalize="characters" placeholder="AAAAA0000A" maxLength={10} error={errors.panNumber} />
 

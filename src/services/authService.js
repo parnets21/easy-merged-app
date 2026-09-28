@@ -83,5 +83,5 @@ export const authService = {
 
   /** Update profile (name, email etc.) */
   updateProfile: (data) =>
-    api.patch('/auth/profile', data),
+    api.patch('/wholesaler/auth/profile', data),
 };

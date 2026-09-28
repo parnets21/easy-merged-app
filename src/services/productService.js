@@ -73,4 +73,14 @@ export const wholesalerProductService = {
 
   // DELETE /api/wholesaler/products/:id  — delete own product
   delete: (id) => api.delete(`/wholesaler/products/${id}`),
+
+  // ── Taxonomy (own categories / sub-categories / brands) ──────
+  // GET → { categories: [{ _id, name, sub_categories: [...] }], brands: [...] }
+  getTaxonomy:      ()     => api.get('/wholesaler/products/taxonomy'),
+  createCategory:   (name) => api.post('/wholesaler/products/categories', { name }),
+  createSubCategory:(name, category_id) => api.post('/wholesaler/products/sub-categories', { name, category_id }),
+  createBrand:      (name) => api.post('/wholesaler/products/brands', { name }),
+  deleteCategory:    (id) => api.delete(`/wholesaler/products/categories/${id}`),
+  deleteSubCategory: (id) => api.delete(`/wholesaler/products/sub-categories/${id}`),
+  deleteBrand:       (id) => api.delete(`/wholesaler/products/brands/${id}`),
 };

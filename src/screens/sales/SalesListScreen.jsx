@@ -6,6 +6,7 @@ import {
   FlatList, Modal, RefreshControl, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon           from '../../components/Icon';
 import EmptyState     from '../../components/EmptyState';
 import ErrorMessage   from '../../components/ErrorMessage';
@@ -189,6 +190,7 @@ function TableRow({ label, value, bold, color }) {
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 export default function SalesListScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [sales,      setSales]      = useState([]);
   const [summary,    setSummary]    = useState(null);
   const [loading,    setLoading]    = useState(true);
@@ -381,7 +383,7 @@ export default function SalesListScreen({ navigation }) {
       )}
 
       {/* ── FAB ────────────────────────────────────────────────────────── */}
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('SalesEntry')} activeOpacity={0.88}>
+      <TouchableOpacity style={[styles.fab, { bottom: 22 + insets.bottom }]} onPress={() => navigation.navigate('SalesEntry')} activeOpacity={0.88}>
         <Icon name="plus" size={20} color={WHITE} />
         <Text style={styles.fabText}>New Sale</Text>
       </TouchableOpacity>

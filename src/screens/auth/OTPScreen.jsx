@@ -22,7 +22,7 @@ import { clearRegStep } from '../../utils/storage';
 const LOGO = require('../../assets/logo.png');
 
 export default function OTPScreen({ route, navigation }) {
-  const { mobile, devOtp, purpose = 'login', nextScreen } = route.params ?? {};
+  const { mobile, devOtp, purpose = 'login', nextScreen, uniqueCode } = route.params ?? {};
   const { login } = useAuth();
 
   // Box starts empty — user types the OTP. We DISPLAY the code on screen
@@ -80,7 +80,7 @@ export default function OTPScreen({ route, navigation }) {
       // ── Registration OTP verified → go to document upload ──────────────
       if (purpose === 'register') {
         await clearRegStep();
-        navigation.replace(nextScreen || 'DocumentUpload', { mobile });
+        navigation.replace(nextScreen || 'DocumentUpload', { mobile, uniqueCode });
         return;
       }
 

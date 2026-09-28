@@ -25,8 +25,14 @@ import { pick, types, isErrorWithCode, errorCodes } from '@react-native-document
 import Icon from '../../components/Icon';
 import { wholesalerProductService } from '../../services/productService';
 import { masterService } from '../../services/masterService';
+import { BASE_URL } from '../../services/api';
 import useAuth from '../../hooks/useAuth';
 import { theme } from '../../utils/theme';
+
+// Product images are stored as relative paths (e.g. /uploads/images/x.jpg).
+// The device can't load a relative URL, so prefix the server host.
+const IMG_HOST = BASE_URL.replace(/\/api\/?$/, '');
+const resolveImg = (u) => (!u ? null : /^https?:\/\//.test(u) ? u : `${IMG_HOST}${u}`);
 
 const NAV = theme.colors.primary;   // #2D1B69
 const OR  = theme.colors.accent;    // #FF6B35
@@ -58,7 +64,7 @@ const STATUS_BADGE = {
 };
 
 function ProductCard({ item, onPress, isMine, onActions }) {
-  const imageUrl  = item.image_urls?.[0];
+  const imageUrl  = resolveImg(item.image_urls?.[0]);
   // category/brand can arrive as a string, a populated object {name}, or {id,name,code}
   const nameOf = (v) => (v && typeof v === 'object' ? (v.name || '—') : (v || '—'));
   const catName   = nameOf(item.category_id) !== '—' ? nameOf(item.category_id) : nameOf(item.category);
@@ -110,9 +116,25 @@ function ProductCard({ item, onPress, isMine, onActions }) {
           </View>
 
           <View style={styles.chipRow}>
-            {item.size   ? <View style={styles.specChip}><Text style={styles.specChipText}>{item.size}</Text></View>   : null}
-            {item.finish ? <View style={styles.specChip}><Text style={styles.specChipText}>{item.finish}</Text></View> : null}
-            {item.color  ? <View style={styles.specChip}><Text style={styles.specChipText}>{item.color}</Text></View>  : null}
+            {(() => {
+              // Prefer category-specific attributes; fall back to legacy columns.
+              const a = item.attributes && typeof item.attributes === 'object' ? item.attributes : {};
+              const chips = [];
+              const push = (v) => { if (v != null && String(v).trim() && chips.length < 4) chips.push(String(v)); };
+              // Show the most identifying attrs first, then legacy fields.
+              push(a.variety || a.design || a.block_type || a.product_type);
+              push(a.granite_type || a.tile_type || a.material);
+              push(a.size || item.size);
+              push(a.thickness || item.thickness);
+              push(a.finish || item.finish);
+              push(a.colour || a.color || item.color);
+              const seen = new Set();
+              return chips.filter(c => { const k = c.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+                .slice(0, 3)
+                .map((c, i) => (
+                  <View key={i} style={styles.specChip}><Text style={styles.specChipText}>{c}</Text></View>
+                ));
+            })()}
           </View>
           <Text style={styles.cardCat} numberOfLines={1}>{catName} · {brandName}</Text>
         </View>
@@ -311,7 +333,7 @@ export default function ProductListScreen({ navigation }) {
   const [products,      setProducts]      = useState([]);
   const [pagination,    setPagination]    = useState({ page: 1, totalPages: 1, total: 0 });
   const [search,        setSearch]        = useState('');
-  const [sourceTab,     setSourceTab]     = useState('all');   // 'all' | 'admin' | 'mine'
+  const [sourceTab,     setSourceTab]     = useState('admin'); // 'all' | 'admin' | 'mine' — default to Admin Catalog
   const [activeFilters, setActiveFilters] = useState({ size: '', finish: '', material: '', color: '', category: '', brand: '' });
   const [filterOptions, setFilterOptions] = useState({ sizes: [], finishes: [], materials: [], colors: [], categories: [], brands: [] });
   const [filterVisible, setFilterVisible] = useState(false);
@@ -322,6 +344,9 @@ export default function ProductListScreen({ navigation }) {
 
   const searchTimer = useRef(null);
   const currentPage = useRef(1);
+  const reqTokenRef = useRef('');          // latest request token (tab:page)
+  const sourceTabRef = useRef('admin');    // mirror of sourceTab for async guards
+  useEffect(() => { sourceTabRef.current = sourceTab; }, [sourceTab]);
 
   // Load filter options once (distinct product values + master category/brand lists)
   useEffect(() => {
@@ -343,11 +368,17 @@ export default function ProductListScreen({ navigation }) {
     else setLoadingMore(true);
     setError(null);
 
+    // Guard against race conditions: if the tab changes before this request
+    // resolves, a stale (e.g. "all") response must NOT overwrite the current tab.
+    const reqTab = sourceTab;
+    reqTokenRef.current = reqTab + ':' + page;
+    const myToken = reqTokenRef.current;
+
     try {
       const params = {
         page, limit: 20,
-        ...(sourceTab === 'admin' && { catalog_only: true }),
-        ...(sourceTab === 'mine'  && { mine: true }),
+        ...(reqTab === 'admin' && { catalog_only: true }),
+        ...(reqTab === 'mine'  && { mine: true }),
         ...(search.trim()          && { search:   search.trim() }),
         ...(activeFilters.size     && { size:     activeFilters.size }),
         ...(activeFilters.finish   && { finish:   activeFilters.finish }),
@@ -358,19 +389,26 @@ export default function ProductListScreen({ navigation }) {
       };
 
       const res  = await wholesalerProductService.listCatalog(params);
+      // Drop the response if the tab changed while we were waiting.
+      if (reqTab !== sourceTabRef.current) return;
       const data = res?.data ?? res ?? {};
-      const list = data.products ?? [];
+      let list = data.products ?? [];
+      // Extra client-side safety net: enforce the tab's rule on the result.
+      if (reqTab === 'mine') list = list.filter(p => p.source === 'wholesaler');
+      else if (reqTab === 'admin') list = list.filter(p => p.source !== 'wholesaler');
       const pag  = data.pagination ?? { page: 1, totalPages: 1, total: list.length };
 
       setProducts(prev => (append && page > 1) ? [...prev, ...list] : list);
       setPagination(pag);
       currentPage.current = page;
     } catch (e) {
-      setError(e?.message || 'Failed to load products');
+      if (reqTab === sourceTabRef.current) setError(e?.message || 'Failed to load products');
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
-      setRefreshing(false);
+      if (myToken === reqTokenRef.current) {
+        setLoading(false);
+        setLoadingMore(false);
+        setRefreshing(false);
+      }
     }
   }, [search, activeFilters, sourceTab]);
 
@@ -422,19 +460,30 @@ export default function ProductListScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Filter button */}
-          <TouchableOpacity
-            style={[styles.headerFilterBtn, activeFilterCount > 0 && styles.headerFilterBtnActive]}
-            onPress={() => setFilterVisible(true)}
-            activeOpacity={0.82}
-          >
-            <Icon name="filter-variant" size={20} color={activeFilterCount > 0 ? NAV : '#fff'} />
-            {activeFilterCount > 0 && (
-              <View style={styles.filterBadge}>
-                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {/* Manage categories & brands */}
+            <TouchableOpacity
+              style={styles.headerFilterBtn}
+              onPress={() => navigation.navigate('CategoryBrandManager')}
+              activeOpacity={0.82}
+            >
+              <Icon name="tag-multiple-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+
+            {/* Filter button */}
+            <TouchableOpacity
+              style={[styles.headerFilterBtn, activeFilterCount > 0 && styles.headerFilterBtnActive]}
+              onPress={() => setFilterVisible(true)}
+              activeOpacity={0.82}
+            >
+              <Icon name="filter-variant" size={20} color={activeFilterCount > 0 ? NAV : '#fff'} />
+              {activeFilterCount > 0 && (
+                <View style={styles.filterBadge}>
+                  <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Search box — code / name / size */}
@@ -462,27 +511,7 @@ export default function ProductListScreen({ navigation }) {
 
       </View>
 
-      {/* ── Source segmented tabs: All / Admin Catalog / My Products ── */}
-      <View style={styles.segmentRow}>
-        {[
-          { key: 'all',   label: 'All',           icon: 'view-grid-outline' },
-          { key: 'admin', label: 'Admin Catalog', icon: 'store-outline' },
-          { key: 'mine',  label: 'My Products',   icon: 'account-outline' },
-        ].map(seg => {
-          const active = sourceTab === seg.key;
-          return (
-            <TouchableOpacity
-              key={seg.key}
-              style={[styles.segment, active && styles.segmentActive]}
-              onPress={() => setSourceTab(seg.key)}
-              activeOpacity={0.85}
-            >
-              <Icon name={seg.icon} size={15} color={active ? '#fff' : NAV} />
-              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{seg.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {/* Source tabs removed — catalog always shows Admin products only. */}
 
       {/* ── Active filter chips ── */}
       {activeFilterCount > 0 && (
@@ -600,20 +629,8 @@ export default function ProductListScreen({ navigation }) {
         onApply={handleApplyFilters}
       />
 
-      {/* ── Bottom action bar ── */}
+      {/* ── Bottom action bar — Buy Item only ── */}
       <View style={[styles.fabBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-        <TouchableOpacity style={styles.fabIcon} activeOpacity={0.8} onPress={() => navigation.navigate('AddProduct')}>
-          <Icon name="plus-circle-outline" size={22} color={NAV} />
-          <Text style={styles.fabIconText}>Add</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.fabIcon} activeOpacity={0.8} onPress={bulkImport}>
-          <Icon name="file-excel-outline" size={22} color={NAV} />
-          <Text style={styles.fabIconText}>Import</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.fabIcon} activeOpacity={0.8} onPress={() => navigation.navigate('InvoiceList')}>
-          <Icon name="receipt-text-outline" size={22} color={NAV} />
-          <Text style={styles.fabIconText}>Invoices</Text>
-        </TouchableOpacity>
         <TouchableOpacity style={styles.fabPrimary} activeOpacity={0.85} onPress={() => navigation.navigate('PurchaseEntry')}>
           <Icon name="cart-outline" size={18} color="#fff" />
           <Text style={styles.fabPrimaryText}>Buy Item</Text>

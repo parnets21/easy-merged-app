@@ -9,6 +9,8 @@ export const employeeService = {
   create: (data)     => api.post('/employees', data),
   update: (id, data) => api.put(`/employees/${id}`, data),
   delete: (id)       => api.delete(`/employees/${id}`),
+  // Current-month sales + earned incentive for a staff member.
+  incentive: (id)    => api.get(`/employees/${id}/incentive`),
 };
 
 // The role a staff member gets in the app, keyed to what they can access.

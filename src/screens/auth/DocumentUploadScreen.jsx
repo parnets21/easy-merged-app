@@ -35,8 +35,8 @@ const DOCS = [
   {
     key:      'pan',
     label:    'PAN Card',
-    required: true,
-    hint:     'Business or owner PAN card (PDF / Image)',
+    required: false,
+    hint:     'Business or owner PAN card (PDF / Image) — optional',
     icon:     '🪪',
   },
   {
@@ -56,7 +56,8 @@ const DOCS = [
 ];
 
 export default function DocumentUploadScreen({ route, navigation }) {
-  const mobile = route?.params?.mobile ?? '';
+  const mobile     = route?.params?.mobile ?? '';
+  const uniqueCode = route?.params?.uniqueCode ?? '';
 
   const [files,   setFiles]   = useState({});
   const [loading, setLoading] = useState(false);
@@ -177,6 +178,15 @@ export default function DocumentUploadScreen({ route, navigation }) {
         <Text style={styles.headerSub}>KYC verification for your business account</Text>
       </View>
 
+      {/* ── Unique code banner (shown right after registration) ── */}
+      {!!uniqueCode && (
+        <View style={styles.codeCard}>
+          <Text style={styles.codeLabel}>Your Wholesaler Code</Text>
+          <Text style={styles.codeValue}>{uniqueCode}</Text>
+          <Text style={styles.codeHint}>Save this code — it's your unique account ID.</Text>
+        </View>
+      )}
+
       {/* ── Progress card ── */}
       <View style={styles.progressCard}>
         <View style={styles.progressRow}>
@@ -189,7 +199,7 @@ export default function DocumentUploadScreen({ route, navigation }) {
           <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
         </View>
         <Text style={styles.progressHint}>
-          GST Certificate + PAN Card are required
+          GST Certificate is required
         </Text>
       </View>
 
@@ -278,7 +288,7 @@ export default function DocumentUploadScreen({ route, navigation }) {
 
       {/* KYC is mandatory before approval — no skip. */}
       <Text style={styles.kycNote}>
-        GST Certificate and PAN Card are mandatory for account verification.
+        GST Certificate is mandatory for account verification. PAN Card is optional.
       </Text>
     </ScrollView>
   );
@@ -323,10 +333,28 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFF', marginBottom: 5 },
   headerSub:   { fontSize: 13, color: 'rgba(255,255,255,0.78)' },
 
-  progressCard: {
+  codeCard: {
     backgroundColor: theme.colors.surface,
     marginHorizontal: 20,
     marginTop: -20,
+    marginBottom: 14,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: theme.colors.accent,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08, shadowRadius: 10, elevation: 4,
+  },
+  codeLabel: { fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary, letterSpacing: 0.4, textTransform: 'uppercase' },
+  codeValue: { fontSize: 26, fontWeight: '900', color: theme.colors.accent, letterSpacing: 2, marginVertical: 4 },
+  codeHint:  { fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center' },
+
+  progressCard: {
+    backgroundColor: theme.colors.surface,
+    marginHorizontal: 20,
+    marginTop: 0,
     borderRadius: 16,
     padding: 16,
     shadowColor: '#000',

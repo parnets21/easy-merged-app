@@ -28,10 +28,12 @@ import ReplyEnquiryScreen       from '../screens/enquiry/ReplyEnquiryScreen';
 import OrderListScreen          from '../screens/order/OrderListScreen';
 import OrderDetailScreen        from '../screens/order/OrderDetailScreen';
 import OrderStatusUpdateScreen  from '../screens/order/OrderStatusUpdateScreen';
+import OrderEntryScreen         from '../screens/order/OrderEntryScreen';
 
 // ── Products — View + Add ────────────────────────────────────
 import ProductDetailScreen      from '../screens/product/ProductDetailScreen';
 import AddProductScreen         from '../screens/product/AddProductScreen';
+import CategoryBrandManagerScreen from '../screens/product/CategoryBrandManagerScreen';
 
 // ── Purchase (Buy items) ─────────────────────────────────────
 import PurchaseEntryScreen      from '../screens/purchase/PurchaseEntryScreen';
@@ -98,6 +100,9 @@ import ProfileScreen            from '../screens/settings/ProfileScreen';
 import SubscriptionPlanScreen   from '../screens/settings/SubscriptionPlanScreen';
 import DocumentListScreen       from '../screens/settings/DocumentListScreen';
 
+// ── Tools ─────────────────────────────────────────────────────
+import StoneCalculationScreen   from '../screens/tools/StoneCalculationScreen';
+
 const Stack = createNativeStackNavigator();
 
 const H = {
@@ -118,12 +123,14 @@ export default function AppStack() {
 
       {/* ── Orders ── */}
       <Stack.Screen name="OrderList"         component={guard('orders', OrderListScreen)}         options={{ headerShown: false }} />
+      <Stack.Screen name="OrderEntry"        component={guard('orders', OrderEntryScreen)}        options={{ headerShown: false }} />
       <Stack.Screen name="OrderDetail"       component={guard('orders', OrderDetailScreen)}       options={{ ...H, title: 'Order Detail' }} />
       <Stack.Screen name="OrderStatusUpdate" component={guard('orders', OrderStatusUpdateScreen)} options={{ ...H, title: 'Update Status' }} />
 
       {/* ── Products ── */}
       <Stack.Screen name="ProductDetail" component={guard('products', ProductDetailScreen)} options={{ headerShown: false }} />
       <Stack.Screen name="AddProduct"    component={guard('products', AddProductScreen)}    options={{ headerShown: false }} />
+      <Stack.Screen name="CategoryBrandManager" component={guard('products', CategoryBrandManagerScreen)} options={{ headerShown: false }} />
 
       {/* ── Purchase (Buy) ── */}
       <Stack.Screen name="PurchaseEntry" component={guard('purchases', PurchaseEntryScreen)} options={{ headerShown: false }} />
@@ -189,6 +196,9 @@ export default function AppStack() {
       <Stack.Screen name="DocumentList"     component={DocumentListScreen}     options={{ headerShown: false }} />
       <Stack.Screen name="Profile"          component={ProfileScreen}          options={{ ...H, title: 'My Profile' }} />
       <Stack.Screen name="SubscriptionPlan" component={SubscriptionPlanScreen} options={{ ...H, title: 'Subscription' }} />
+
+      {/* ── Tools ── */}
+      <Stack.Screen name="StoneCalculation" component={StoneCalculationScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }

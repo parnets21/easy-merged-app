@@ -6,6 +6,7 @@ import {
   Alert, FlatList, Image, Modal, RefreshControl, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BASE_URL } from '../../services/api';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import Icon           from '../../components/Icon';
@@ -237,6 +238,7 @@ function InfoRow({ label, value }) {
 // MAIN SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 export default function DispatchTrackingScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [dispatches, setDispatches] = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -401,7 +403,7 @@ export default function DispatchTrackingScreen({ navigation }) {
       />
 
       {/* ── FAB ────────────────────────────────────────────────────────── */}
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('DispatchEntry')} activeOpacity={0.88}>
+      <TouchableOpacity style={[styles.fab, { bottom: 22 + insets.bottom }]} onPress={() => navigation.navigate('DispatchEntry')} activeOpacity={0.88}>
         <Icon name="plus" size={20} color={WHITE} />
         <Text style={styles.fabText}>New Dispatch</Text>
       </TouchableOpacity>

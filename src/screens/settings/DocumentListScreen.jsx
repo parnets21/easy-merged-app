@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert, FlatList, Linking, Modal, StatusBar, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import Icon from '../../components/Icon';
 import EmptyState from '../../components/EmptyState';
@@ -20,6 +21,7 @@ const DOC_TYPES = ['GST Certificate', 'Purchase Bill', 'Sales Bill', 'Product Ca
 const TABS = ['All', ...DOC_TYPES];
 
 export default function DocumentListScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [docs, setDocs]     = useState([]);
   const [tab, setTab]       = useState('All');
   const [loading, setLoading] = useState(true);
@@ -114,7 +116,7 @@ export default function DocumentListScreen({ navigation }) {
         />
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={() => setPicker(true)} activeOpacity={0.85}>
+      <TouchableOpacity style={[styles.fab, { bottom: 20 + insets.bottom }]} onPress={() => setPicker(true)} activeOpacity={0.85}>
         <Text style={styles.fabText}>+  Upload Document</Text>
       </TouchableOpacity>
 

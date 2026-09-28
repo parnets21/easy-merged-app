@@ -5,6 +5,7 @@ import {
   Alert, FlatList, KeyboardAvoidingView, Modal, Platform, ScrollView,
   StatusBar, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import FormField from '../../components/FormField';
 import EmptyState from '../../components/EmptyState';
@@ -16,6 +17,7 @@ const NAVY = theme.colors.primary;
 const EMPTY = { name: '', city: '', state: '', address: '', contact_person: '', mobile: '' };
 
 export default function WarehouseListScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [showForm, setShowForm]     = useState(false);
@@ -86,7 +88,7 @@ export default function WarehouseListScreen({ navigation }) {
         />
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={openAdd} activeOpacity={0.85}>
+      <TouchableOpacity style={[styles.fab, { bottom: 20 + insets.bottom }]} onPress={openAdd} activeOpacity={0.85}>
         <Text style={styles.fabText}>+  Add Warehouse</Text>
       </TouchableOpacity>
 

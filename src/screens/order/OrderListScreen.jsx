@@ -37,7 +37,14 @@ export default function OrderListScreen({ navigation }) {
     setLoading(true); setError(null);
     try {
       const res = await orderService.list({});
-      setOrders(res?.data ?? res ?? []);
+      // Backend returns { success, data: { orders: [...], pagination } }.
+      // Guard against any shape and always land on an array.
+      const list =
+        res?.data?.orders ??
+        res?.orders ??
+        (Array.isArray(res?.data) ? res.data : null) ??
+        (Array.isArray(res) ? res : []);
+      setOrders(Array.isArray(list) ? list : []);
     } catch (e) { setError(e?.message || 'Failed to load orders'); }
     finally { setLoading(false); }
   }, []);
@@ -45,13 +52,24 @@ export default function OrderListScreen({ navigation }) {
   useEffect(() => { load(); }, [load]);
 
   const activeStatus = TABS[tabIdx];
-  const filtered     = (orders || []).filter(o => o.status === activeStatus);
+  const orderList    = Array.isArray(orders) ? orders : [];
+  const filtered     = orderList.filter(o => o.status === activeStatus);
 
-  if (loading && !orders.length) return <LoadingSpinner />;
+  if (loading && !orderList.length) return <LoadingSpinner />;
   if (error)                      return <ErrorMessage message={error} onRetry={load} />;
 
   return (
     <View style={styles.screen}>
+      {/* Create Order button */}
+      <TouchableOpacity
+        style={styles.createBtn}
+        onPress={() => navigation.navigate('OrderEntry')}
+        activeOpacity={0.85}
+      >
+        <Icon name="plus" size={18} color="#fff" />
+        <Text style={styles.createBtnText}>Create Order</Text>
+      </TouchableOpacity>
+
       {/* Tab bar */}
       <View style={styles.tabBarWrap}>
         <FlatList
@@ -60,7 +78,7 @@ export default function OrderListScreen({ navigation }) {
           contentContainerStyle={styles.tabList}
           renderItem={({ item: tab, index }) => {
             const active = index === tabIdx;
-            const count  = (orders || []).filter(o => o.status === tab).length;
+            const count  = orderList.filter(o => o.status === tab).length;
             return (
               <TouchableOpacity
                 style={[styles.tab, active && styles.tabActive]}
@@ -135,6 +153,13 @@ export default function OrderListScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F4F6FA' },
+
+  createBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: theme.colors.primary, margin: 12, marginBottom: 0,
+    borderRadius: 12, paddingVertical: 13,
+  },
+  createBtnText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 
   tabBarWrap: { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   tabList: { paddingHorizontal: 12, paddingVertical: 10, gap: 8, flexDirection: 'row' },

@@ -5,6 +5,7 @@ import {
   Alert, FlatList, KeyboardAvoidingView, Modal, Platform, RefreshControl,
   ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import FormField from '../../components/FormField';
 import EmptyState from '../../components/EmptyState';
@@ -27,6 +28,7 @@ const STATUS_COLOR = {
 const EMPTY = { name: '', mobile: '', email: '', source: 'Website', status: 'New', notes: '' };
 
 export default function LeadListScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [leads, setLeads]     = useState([]);
   const [tab, setTab]         = useState('All');
   const [loading, setLoading] = useState(true);
@@ -167,7 +169,7 @@ export default function LeadListScreen({ navigation }) {
         />
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={openAdd} activeOpacity={0.85}>
+      <TouchableOpacity style={[styles.fab, { bottom: 20 + insets.bottom }]} onPress={openAdd} activeOpacity={0.85}>
         <Text style={styles.fabText}>+  Add Lead</Text>
       </TouchableOpacity>
 

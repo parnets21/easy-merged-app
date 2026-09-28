@@ -1,6 +1,7 @@
 // src/screens/customer/CustomerListScreen.jsx
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import EmptyState from '../../components/EmptyState';
 import ErrorMessage from '../../components/ErrorMessage';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -9,6 +10,7 @@ import { filterCustomers, formatCurrency } from '../../utils/formatters';
 import { theme } from '../../utils/theme';
 
 export default function CustomerListScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [customers, setCustomers] = useState([]);
   const [search,    setSearch]    = useState('');
   const [loading,   setLoading]   = useState(true);
@@ -58,7 +60,7 @@ export default function CustomerListScreen({ navigation }) {
         contentContainerStyle={styles.list}
         ListEmptyComponent={<EmptyState icon="👥" title="No customers found" />}
       />
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('AddCustomer')} activeOpacity={0.85}>
+      <TouchableOpacity style={[styles.fab, { bottom: 20 + insets.bottom }]} onPress={() => navigation.navigate('AddCustomer')} activeOpacity={0.85}>
         <Text style={styles.fabText}>+  Add Customer</Text>
       </TouchableOpacity>
     </View>

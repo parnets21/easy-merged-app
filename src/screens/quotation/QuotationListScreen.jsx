@@ -9,6 +9,7 @@ import {
   ActivityIndicator, Alert, FlatList, Platform, RefreshControl, StatusBar,
   StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { quotationService } from '../../services/quotationService';
 import { theme } from '../../utils/theme';
@@ -24,6 +25,7 @@ const STATUS_META = {
 };
 
 export default function QuotationListScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -147,7 +149,7 @@ export default function QuotationListScreen({ navigation }) {
           data={rows}
           keyExtractor={r => r._id}
           renderItem={renderItem}
-          contentContainerStyle={{ padding: 14, paddingBottom: 40 }}
+          contentContainerStyle={{ padding: 14, paddingBottom: 90 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} colors={[theme.colors.accent]} />}
           ListEmptyComponent={
             <View style={styles.empty}>
@@ -159,7 +161,7 @@ export default function QuotationListScreen({ navigation }) {
         />
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('ProductRequest')} activeOpacity={0.9}>
+      <TouchableOpacity style={[styles.fab, { bottom: 20 + insets.bottom }]} onPress={() => navigation.navigate('ProductRequest')} activeOpacity={0.9}>
         <Icon name="plus" size={20} color="#fff" />
         <Text style={styles.fabText}>Request Quotation</Text>
       </TouchableOpacity>

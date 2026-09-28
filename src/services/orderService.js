@@ -8,6 +8,8 @@ export const orderService = {
   // Idempotent — copies product/qty/rate/gst from the (Confirmed) enquiry into a new order.
   createFromEnquiry: (data) => api.post('/orders/from-enquiry', data),
   updateStatus: (id, data)  => api.patch(`/orders/${id}/status`, data),
+  // Assign an order to a staff member (POST /orders/:id/assign).
+  assign:       (id, data)  => api.post(`/orders/${id}/assign`, data),
   // Generate a GST invoice from an order (idempotent).
   generateInvoice: (id)     => api.post(`/orders/${id}/invoice`, {}),
 };

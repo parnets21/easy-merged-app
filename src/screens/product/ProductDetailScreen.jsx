@@ -20,10 +20,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from '../../components/Icon';
 import { wholesalerProductService } from '../../services/productService';
+import { BASE_URL } from '../../services/api';
 import { theme } from '../../utils/theme';
 
 const NAV = theme.colors.primary;
 const OR  = theme.colors.accent;
+
+// Prefix relative image paths (/uploads/...) with the server host so the device can load them.
+const IMG_HOST = BASE_URL.replace(/\/api\/?$/, '');
+const resolveImg = (u) => (!u ? null : /^https?:\/\//.test(u) ? u : `${IMG_HOST}${u}`);
 
 // ── Divider ───────────────────────────────────────────────────
 const Divider = () => <View style={styles.divider} />;
@@ -160,7 +165,7 @@ export default function ProductDetailScreen({ route, navigation }) {
   const catName   = nameOf(product.category_id)     || nameOf(product.category) || null;
   const brandName = nameOf(product.brand_id)        || nameOf(product.brand)    || null;
   const subCat    = nameOf(product.sub_category_id) || null;
-  const imageUrl  = product.image_urls?.[0];
+  const imageUrl  = resolveImg(product.image_urls?.[0]);
 
   const headerTags = [
     catName   && { icon: 'shape-outline',      label: catName   },
@@ -228,8 +233,18 @@ export default function ProductDetailScreen({ route, navigation }) {
             <InfoRow label="Origin"       value={product.origin} />
             <InfoRow label="Manufacturer" value={product.manufacturer} />
             <InfoRow label="Collection"   value={product.collection} />
+            <InfoRow label="Barcode / EAN" value={product.barcode} />
+            <InfoRow label="HSN Code"     value={product.hsn_code} />
+            <InfoRow label="GST %"        value={product.gst_percent != null ? `${product.gst_percent}%` : null} />
             <InfoRow label="Unit"         value={product.unit} last />
           </SectionCard>
+
+          {/* ── Description ── */}
+          {product.description ? (
+            <SectionCard icon="text-box-outline" title="DESCRIPTION">
+              <Text style={styles.descText}>{product.description}</Text>
+            </SectionCard>
+          ) : null}
 
           {/* ── Images gallery ── */}
           {product.image_urls?.length > 1 && (
@@ -242,7 +257,7 @@ export default function ProductDetailScreen({ route, navigation }) {
                 {product.image_urls.map((url, i) => (
                   <Image
                     key={i}
-                    source={{ uri: url }}
+                    source={{ uri: resolveImg(url) }}
                     style={styles.galleryImg}
                     resizeMode="cover"
                   />
@@ -260,25 +275,17 @@ export default function ProductDetailScreen({ route, navigation }) {
             </SectionCard>
           )}
 
-          {/* ── Admin Pricing (reference only) ── */}
-          {(product.mrp || product.selling_price || product.dealer_price) ? (
-            <SectionCard icon="tag-outline" title="ADMIN PRICING  (Reference Only)">
+          {/* ── Wholesale Price only (admin reference prices are hidden) ── */}
+          {product.wholesale_rate ? (
+            <SectionCard icon="tag-outline" title="WHOLESALE PRICE">
               <View style={styles.priceGrid}>
-                {[
-                  { label: 'MRP',           value: product.mrp            },
-                  { label: 'Selling Price', value: product.selling_price  },
-                  { label: 'Dealer Price',  value: product.dealer_price   },
-                  { label: 'Retail Price',  value: product.retail_price   },
-                  { label: 'Wholesale',     value: product.wholesale_rate },
-                  { label: 'Project Rate',  value: product.project_rate   },
-                ].filter(p => p.value).map(({ label, value }) => (
-                  <View key={label} style={styles.priceItem}>
-                    <Text style={styles.priceLbl}>{label}</Text>
-                    <Text style={styles.priceVal}>
-                      ₹{Number(value).toLocaleString('en-IN')}
-                    </Text>
-                  </View>
-                ))}
+                <View style={styles.priceItem}>
+                  <Text style={styles.priceLbl}>Wholesale Rate</Text>
+                  <Text style={styles.priceVal}>
+                    ₹{Number(product.wholesale_rate).toLocaleString('en-IN')}
+                    {product.unit ? ` / ${product.unit}` : ''}
+                  </Text>
+                </View>
               </View>
             </SectionCard>
           ) : null}
@@ -409,6 +416,9 @@ const styles = StyleSheet.create({
   infoRowBorder: { borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   infoLabel:     { fontSize: 13, color: theme.colors.textSecondary },
   infoValue:     { fontSize: 13, fontWeight: '600', color: theme.colors.textPrimary, maxWidth: '55%', textAlign: 'right' },
+
+  /* Description */
+  descText: { fontSize: 13, color: theme.colors.textPrimary, lineHeight: 20 },
 
   /* Gallery */
   galleryImg: { width: 100, height: 100, borderRadius: 10 },
