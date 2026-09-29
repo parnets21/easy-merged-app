@@ -374,7 +374,8 @@ function NewSheetModal({ productKey, onClose, onCreate }) {
     onCreate({
       id: null, product: productKey, name: name.trim(), party: party.trim(), date: date.trim(),
       inputUnit: 'inch', outputUnit: 'feet',
-      rows: Array.from({ length: n }, () => ({ length: '', width: '' })), total: 0,
+      rows: Array.from({ length: n }, () => ({ length: '', width: '' })),
+      total: 0, price: 0,
     });
   };
 
@@ -462,11 +463,16 @@ function EditView({ sheet, onSaved }) {
   const [rows, setRows]           = useState(sheet.rows.length ? sheet.rows : [{ length: '', width: '' }]);
   const [inputUnit, setInputUnit] = useState(sheet.inputUnit || 'inch');
   const [outputUnit, setOutput]   = useState(sheet.outputUnit || 'feet');
+  const [price, setPrice]         = useState(String(sheet.price || ''));
   const [saving, setSaving]       = useState(false);
   const [pickerFor, setPickerFor] = useState(null);
 
-  const sym = AREA_SYMBOL[outputUnit];
-  const total = useMemo(() => sumArea(rows, inputUnit, outputUnit), [rows, inputUnit, outputUnit]);
+  const sym    = AREA_SYMBOL[outputUnit];
+  const total  = useMemo(() => sumArea(rows, inputUnit, outputUnit), [rows, inputUnit, outputUnit]);
+  const amount = useMemo(() => {
+    const p = parseFloat(price);
+    return isFinite(p) && p > 0 ? total * p : 0;
+  }, [total, price]);
 
   const setCell = (i, field, val) => setRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)));
   const addRow = () => setRows(rs => [...rs, { length: '', width: '' }]);
@@ -479,7 +485,12 @@ function EditView({ sheet, onSaved }) {
 
   const save = async () => {
     setSaving(true);
-    const payload = { product: sheet.product, name: sheet.name, party: sheet.party, date: sheet.date, inputUnit, outputUnit, rows, total };
+    const payload = {
+      product: sheet.product, name: sheet.name, party: sheet.party, date: sheet.date,
+      inputUnit, outputUnit, rows, total,
+      price: parseFloat(price) || 0,
+      amount,
+    };
     if (sheet.id) await stoneService.update(sheet.id, payload);
     else          await stoneService.create(payload);
     setSaving(false);
@@ -504,6 +515,30 @@ function EditView({ sheet, onSaved }) {
         <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
           <UnitField label="Input unit"  value={inputUnit}  accent={NAVY}   onPress={() => setPickerFor('input')} />
           <UnitField label="Output unit" value={outputUnit} accent={ORANGE} onPress={() => setPickerFor('output')} />
+        </View>
+
+        {/* price per unit area */}
+        <View style={styles.priceRow}>
+          <View style={styles.priceIconWrap}>
+            <Icon name="currency-inr" size={20} color={ORANGE} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.fieldLabel}>Rate per {AREA_SYMBOL[outputUnit]} (optional)</Text>
+            <TextInput
+              style={styles.priceInput}
+              value={price}
+              onChangeText={t => setPrice(t.replace(/[^\d.]/g, ''))}
+              keyboardType="decimal-pad"
+              placeholder="e.g. 350"
+              placeholderTextColor={MUTED}
+            />
+          </View>
+          {parseFloat(price) > 0 && (
+            <View style={styles.amountBadge}>
+              <Text style={styles.amountBadgeLabel}>Total Amount</Text>
+              <Text style={styles.amountBadgeValue}>₹ {amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</Text>
+            </View>
+          )}
         </View>
 
         {/* per-row cards */}
@@ -550,6 +585,9 @@ function EditView({ sheet, onSaved }) {
         <View>
           <Text style={styles.footerLabel}>Sum Total</Text>
           <Text style={styles.footerTotal}>{fmtArea(total, 2)} <Text style={styles.footerUnit}>{sym}</Text></Text>
+          {parseFloat(price) > 0 && (
+            <Text style={styles.footerAmount}>₹ {amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</Text>
+          )}
         </View>
         <TouchableOpacity style={[styles.footerSave, saving && { opacity: 0.7 }]} onPress={save} disabled={saving}>
           <Icon name="content-save-outline" size={18} color="#fff" />
@@ -629,9 +667,24 @@ function SheetView({ sheet, onShare, onEdit }) {
           );
         })}
 
-        <View style={styles.viewTotalCard}>
+        <View style={[styles.viewTotalCard, { flexDirection: 'column' }]}>
           <Text style={styles.footerLabel}>Sum Total</Text>
           <Text style={styles.viewTotalValue}>{fmtArea(sheet.total, 2)} <Text style={styles.footerUnit}>{sym}</Text></Text>
+          {sheet.price > 0 && (
+            <>
+              <View style={styles.viewPriceDivider} />
+              <View style={styles.viewPriceRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.footerLabel}>Rate per {sym}</Text>
+                  <Text style={styles.viewPriceValue}>₹ {Number(sheet.price).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</Text>
+                </View>
+                <View style={styles.viewAmountBox}>
+                  <Text style={styles.viewAmountLabel}>TOTAL AMOUNT</Text>
+                  <Text style={styles.viewAmountValue}>₹ {Number(sheet.amount || (sheet.total * sheet.price)).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</Text>
+                </View>
+              </View>
+            </>
+          )}
         </View>
       </ScrollView>
 
@@ -776,6 +829,21 @@ const styles = StyleSheet.create({
   viewX: { color: MUTED, fontWeight: '400' },
   viewTotalCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: NAVY, borderRadius: 16, padding: 16, marginTop: 8 },
   viewTotalValue: { fontSize: 22, fontWeight: '900', color: '#fff' },
+  viewPriceDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.15)', marginVertical: 12 },
+  viewPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  viewPriceValue: { fontSize: 18, fontWeight: '800', color: '#fff', marginTop: 2 },
+  viewAmountBox: { backgroundColor: ORANGE, borderRadius: 12, padding: 12, alignItems: 'flex-end' },
+  viewAmountLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.5, color: 'rgba(255,255,255,0.8)' },
+  viewAmountValue: { fontSize: 20, fontWeight: '900', color: '#fff', marginTop: 2 },
+
+  /* price row in edit view */
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: WHITE, borderRadius: 16, padding: 14, marginBottom: 16, ...SHADOW },
+  priceIconWrap: { width: 44, height: 44, borderRadius: 13, backgroundColor: ORANGE_LT, alignItems: 'center', justifyContent: 'center' },
+  priceInput: { backgroundColor: '#F8FAFC', borderWidth: 1.5, borderColor: BORDER, borderRadius: 12, paddingHorizontal: 12, height: 44, fontSize: 15, fontWeight: '700', color: TEXT, marginTop: 2 },
+  amountBadge: { alignItems: 'flex-end', backgroundColor: ORANGE_LT, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  amountBadgeLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, color: ORANGE },
+  amountBadgeValue: { fontSize: 15, fontWeight: '900', color: ORANGE, marginTop: 2 },
+  footerAmount: { fontSize: 14, fontWeight: '800', color: ORANGE, marginTop: 2 },
 
   /* calendar + picker */
   calCard: { backgroundColor: WHITE, borderRadius: 18, padding: 16 },
