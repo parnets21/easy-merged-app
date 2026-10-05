@@ -1,0 +1,231 @@
+// src/screens/enquiry/ReplyEnquiryScreen.jsx
+//
+// Updated to match RetailerApp's reply-modal pattern:
+// - Loads and displays reply history above the form
+// - Saves new replies to reply history (createReplyHistory) in addition to
+//   the actual reply/offer call
+// - Keeps the marketplace vs manual enquiry branching
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Icon from '../../components/Icon';
+import FormField from '../../components/FormField';
+import PrimaryButton from '../../components/PrimaryButton';
+import { enquiryService } from '../../services/enquiryService';
+import { formatCurrency } from '../../utils/formatters';
+import { theme } from '../../utils/theme';
+
+export default function ReplyEnquiryScreen({ route, navigation }) {
+  const { enquiryId, enquiry } = route.params;
+  const isMarketplace = !!(enquiry?.buyer_company_id);
+
+  const [form,    setForm]    = useState({
+    rate: enquiry?.offered_price != null ? String(enquiry.offered_price) : '',
+    gst: enquiry?.gst_percent != null ? String(enquiry.gst_percent) : '18',
+    transport: '', packing: '', message: '',
+    available_qty: enquiry?.available_quantity != null ? String(enquiry.available_quantity) : '',
+    timeline: enquiry?.delivery_timeline || '',
+  });
+  const [errors,  setErrors]  = useState({});
+  const [loading, setLoading] = useState(false);
+  const [replyHistory, setReplyHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: null })); };
+
+  // ── Load reply history ──
+  const loadHistory = useCallback(async () => {
+    if (!enquiryId) return;
+    setHistoryLoading(true);
+    try {
+      const res = await enquiryService.listReplyHistory(enquiryId);
+      const list = res?.data?.replies ?? res?.replies ?? res?.data ?? [];
+      setReplyHistory(Array.isArray(list) ? list : []);
+    } catch {
+      setReplyHistory([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [enquiryId]);
+
+  useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  const handleSubmit = async () => {
+    const errs = {};
+    if (!form.rate) errs.rate = 'Rate is required';
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setLoading(true);
+    try {
+      // 1. Save to reply history (for tracking)
+      try {
+        await enquiryService.createReplyHistory(enquiryId, {
+          offered_price:      parseFloat(form.rate),
+          available_quantity: form.available_qty ? parseFloat(form.available_qty) : undefined,
+          delivery_timeline:  form.timeline,
+          remarks:            form.message,
+          unit:               enquiry?.unit || '',
+        });
+      } catch { /* non-fatal */ }
+
+      // 2. Update the enquiry itself
+      if (isMarketplace) {
+        await enquiryService.sendOffer(enquiryId, {
+          unit_price:         parseFloat(form.rate),
+          gst_percent:        form.gst ? parseFloat(form.gst) : undefined,
+          transport_charge:  form.transport ? parseFloat(form.transport) : 0,
+          packing_charge:    form.packing ? parseFloat(form.packing) : 0,
+          available_quantity: form.available_qty ? parseFloat(form.available_qty) : undefined,
+          delivery_timeline:  form.timeline,
+          notes:              form.message,
+        });
+      } else {
+        await enquiryService.reply(enquiryId, {
+          status:             'Replied',
+          offered_price:      parseFloat(form.rate),
+          available_quantity: form.available_qty ? parseFloat(form.available_qty) : undefined,
+          delivery_timeline:  form.timeline,
+          negotiation_note:   form.message,
+          distributor_reply:  form.message,
+        });
+      }
+      Alert.alert('Success', isMarketplace ? 'Offer sent successfully' : 'Reply sent successfully');
+      navigation.goBack();
+    } catch (e) {
+      Alert.alert('Error', e?.message || 'Failed to send reply');
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+      >
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        >
+
+          <Text style={styles.subtitle}>
+            {isMarketplace
+              ? `Send your offer${enquiry?.qty ? ` for ${enquiry.qty} ${enquiry.unit || ''}` : ''}`
+              : 'Fill in your reply details'}
+          </Text>
+
+          {/* ── Reply History ── */}
+          {replyHistory.length > 0 && (
+            <View style={styles.historySection}>
+              <View style={styles.historyHeader}>
+                <Icon name="clock-outline" size={13} color={theme.colors.textSecondary} />
+                <Text style={styles.historyTitle}>Your Reply History ({replyHistory.length})</Text>
+              </View>
+              {replyHistory.map((h, i) => (
+                <View key={h.id || h._id || i} style={[
+                  styles.historyCard,
+                  i === replyHistory.length - 1 && styles.historyCardLatest,
+                ]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Icon name="tag-outline" size={13} color={theme.colors.primary} />
+                      <Text style={styles.historyPrice}>{formatCurrency(h.offered_price)}</Text>
+                    </View>
+                    {h.available_quantity != null && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Icon name="cube-outline" size={12} color={theme.colors.textSecondary} />
+                        <Text style={styles.historyMeta}>{h.available_quantity} {h.unit || enquiry?.unit || ''}</Text>
+                      </View>
+                    )}
+                  </View>
+                  {h.delivery_timeline ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                      <Icon name="clock-outline" size={12} color={theme.colors.textSecondary} />
+                      <Text style={styles.historyMeta}>{h.delivery_timeline}</Text>
+                    </View>
+                  ) : null}
+                  {h.remarks ? (
+                    <Text style={styles.historyRemarks}>"{h.remarks}"</Text>
+                  ) : null}
+                  <View style={styles.historyFooter}>
+                    <Text style={styles.historySender}>
+                      {h.sender_name || 'You'}
+                      {h.created_at ? ' · ' + new Date(h.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}
+                    </Text>
+                    {i === replyHistory.length - 1 && (
+                      <View style={styles.latestBadge}>
+                        <Icon name="check-circle-outline" size={10} color="#16a34a" />
+                        <Text style={styles.latestBadgeText}>Latest</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {historyLoading && <Text style={styles.loadingText}>Loading history...</Text>}
+
+          {/* ── Form ── */}
+          <FormField label="Your Rate (Rs per unit) *" value={form.rate}
+            onChangeText={v => set('rate', v)} keyboardType="decimal-pad" error={errors.rate} />
+          <FormField label={`Available Quantity${enquiry?.unit ? ` (${enquiry.unit})` : ''}`} value={form.available_qty}
+            onChangeText={v => set('available_qty', v)} keyboardType="decimal-pad"
+            placeholder={enquiry?.qty ? `Requested: ${enquiry.qty}` : 'How much can you supply'} />
+          <FormField label="Delivery Timeline" value={form.timeline}
+            onChangeText={v => set('timeline', v)} placeholder="e.g. 3-5 days / Ready stock" />
+          {isMarketplace && (
+            <>
+              <FormField label="GST %" value={form.gst}
+                onChangeText={v => set('gst', v)} keyboardType="decimal-pad" />
+              <FormField label="Transport Charge (Rs)" value={form.transport}
+                onChangeText={v => set('transport', v)} keyboardType="decimal-pad" placeholder="0" />
+              <FormField label="Packing Charge (Rs)" value={form.packing}
+                onChangeText={v => set('packing', v)} keyboardType="decimal-pad" placeholder="0" />
+            </>
+          )}
+          <FormField label="Message / Remarks" value={form.message}
+            onChangeText={v => set('message', v)} multiline />
+          <PrimaryButton title={isMarketplace ? 'Send Offer' : 'Send Reply'}
+            onPress={handleSubmit} loading={loading} style={styles.btn} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { padding: 20, paddingBottom: 120, backgroundColor: theme.colors.background, flexGrow: 1 },
+  subtitle:  { fontSize: 13, color: theme.colors.textSecondary, marginBottom: 18 },
+
+  /* ── Reply history ── */
+  historySection: { marginBottom: 20 },
+  historyHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  historyTitle: {
+    fontSize: 11, fontWeight: '700', color: '#64748B',
+    textTransform: 'uppercase', letterSpacing: 0.5,
+  },
+  historyCard: {
+    backgroundColor: '#FFF', borderRadius: 10,
+    borderWidth: 1, borderColor: '#E2E8F0',
+    padding: 12, marginBottom: 8,
+  },
+  historyCardLatest: { borderWidth: 2, borderColor: theme.colors.primary },
+  historyPrice: { fontSize: 16, fontWeight: '800', color: theme.colors.primary },
+  historyMeta: { fontSize: 12, color: '#64748B' },
+  historyRemarks: { fontSize: 11, color: '#94A3B8', fontStyle: 'italic', marginBottom: 4 },
+  historyFooter: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4,
+  },
+  historySender: { fontSize: 10, color: '#94A3B8' },
+  latestBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: '#DCFCE7', borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2,
+  },
+  latestBadgeText: { fontSize: 10, fontWeight: '700', color: '#16a34a' },
+  loadingText: { fontSize: 12, color: theme.colors.textDisabled, textAlign: 'center', marginBottom: 10 },
+
+  btn: { marginTop: 8 },
+});

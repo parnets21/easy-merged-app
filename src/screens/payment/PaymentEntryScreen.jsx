@@ -33,8 +33,14 @@ export default function PaymentEntryScreen({ route, navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        showsVerticalScrollIndicator={false}
+      >
         {partyName && <Text style={styles.partyName}>{partyType}: {partyName}</Text>}
         <FormField label="Amount (₹) *" value={amount} onChangeText={v => { setAmount(v); setErrors({}); }} keyboardType="decimal-pad" error={errors.amount} />
         <Text style={styles.label}>Payment Mode</Text>
@@ -55,7 +61,7 @@ export default function PaymentEntryScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container:     { padding: 20, backgroundColor: theme.colors.background, flexGrow: 1 },
+  container:     { padding: 20, backgroundColor: theme.colors.background, flexGrow: 1, paddingBottom: 48 },
   partyName:     { fontSize: 16, fontWeight: '700', color: theme.colors.primary, marginBottom: 14 },
   label:         { fontSize: 13, fontWeight: '600', color: theme.colors.textPrimary, marginBottom: 8 },
   pills:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },

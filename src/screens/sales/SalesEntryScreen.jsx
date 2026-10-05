@@ -112,8 +112,14 @@ export default function SalesEntryScreen({ navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        showsVerticalScrollIndicator={false}
+      >
         <FormField label="Customer Name *" value={customerName} onChangeText={setCustomerName} />
 
         <Text style={styles.sectionTitle}>Products</Text>
@@ -210,7 +216,7 @@ export default function SalesEntryScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container:    { padding: 20, backgroundColor: theme.colors.background, flexGrow: 1 },
+  container:    { padding: 20, backgroundColor: theme.colors.background, flexGrow: 1, paddingBottom: 48 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: theme.colors.textPrimary, marginBottom: 8, textTransform: 'uppercase' },
   itemBox:      { backgroundColor: '#f0f4ff', borderRadius: 8, padding: 12, marginBottom: 8 },
   row:          { flexDirection: 'row' },

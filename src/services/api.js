@@ -12,12 +12,12 @@ import { getToken, removeToken } from '../utils/storage';
 // If network changes, update this line and rebuild the app.
 //
 // LOCAL backend on the PC's Wi-Fi IP (works over wireless — phone + PC on same Wi-Fi).
-// For USB use 'http://localhost:5000/api' with `adb reverse tcp:5000`.
+// For USB use 'https://ezyenquiry-backend.onrender.com/api' with `adb reverse tcp:5000`.
 // For production use the Render URL below.
 // Using localhost over USB (`adb reverse tcp:5000 tcp:5000`). This is reliable
 // even when the WiFi router has AP/client isolation enabled (which blocks
 // phone → PC traffic over WiFi, e.g. 192.168.1.38 was unreachable).
-export const BASE_URL = 'http://localhost:5000/api';
+export const BASE_URL = 'https://ezyenquiry-backend.onrender.com/api';
 // export const BASE_URL = 'http://192.168.1.38:5000/api';  // WiFi IP — needs router without AP isolation
 // export const BASE_URL = 'https://ezyenquiry-backend.onrender.com/api';
 

@@ -12,7 +12,14 @@ export default function useOrders(status) {
     setError(null);
     try {
       const res = await orderService.list(status ? { status } : {});
-      const list = res?.data ?? res ?? [];
+      // Raw backend envelope: `{ success, message, data: { orders, pagination } }`.
+      // `res.data` is that object (it also carries `pagination`), so it is NOT
+      // the row array — unwrap `data.orders` first, then the bare shapes.
+      const list =
+        (Array.isArray(res?.data) ? res.data : null)
+        ?? res?.data?.orders
+        ?? res?.orders
+        ?? (Array.isArray(res) ? res : []);
       setOrders(Array.isArray(list) ? list : []);
     } catch (err) {
       setError(err?.message || 'Failed to load orders');

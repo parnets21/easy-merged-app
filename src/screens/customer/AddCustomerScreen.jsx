@@ -59,7 +59,7 @@ export default function AddCustomerScreen({ route, navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.primary} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}><Text style={styles.back}>←</Text></TouchableOpacity>
@@ -67,7 +67,13 @@ export default function AddCustomerScreen({ route, navigation }) {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.card}>
           <FormField label="Customer Name *" value={form.name} onChangeText={v => set('name', v)} placeholder="Full name / shop name" error={errors.name} />
           <FormField label="Mobile Number *" value={form.mobile} onChangeText={v => set('mobile', v.replace(/\D/g, ''))} keyboardType="number-pad" maxLength={10} placeholder="10-digit mobile" error={errors.mobile} />
@@ -102,7 +108,7 @@ const styles = StyleSheet.create({
   },
   back: { color: '#fff', fontSize: 24, fontWeight: '700' },
   headerTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
-  container: { padding: 16, backgroundColor: theme.colors.background },
+  container: { padding: 16, backgroundColor: theme.colors.background, paddingBottom: 40 },
   card: { backgroundColor: theme.colors.surface, borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: theme.colors.border },
   row: { flexDirection: 'row', gap: 10 },
   col: { flex: 1 },

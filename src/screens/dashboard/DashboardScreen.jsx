@@ -165,11 +165,21 @@ function EnqCard({ item, onPress, isLast }) {
 
   const enquiryCode =
     item.enq_code || item.enquiry_code || `#${item._id?.slice(-6) || '------'}`;
-  const customer =
-    item.retailer_name || item.customer_name || item.retailer?.name || 'Customer';
   const product =
     item.product_name || item.product_code || item.product?.design_name || 'Product';
   const quantity = item.qty ?? item.quantity ?? 0;
+
+  // Direction matters for the label:
+  //  • RECEIVED → the party that sent it (retailer / customer name).
+  //  • SENT (we raised the broadcast) → showing our own name is noise, so the
+  //    PRODUCT becomes the headline and we surface how many replies came back.
+  const isSent = item.direction === 'sent';
+  const customer = item.retailer_name || item.customer_name || item.retailer?.name || 'Customer';
+  const headline = isSent ? product : customer;
+
+  const repliedNote = isSent && item.__replied > 0
+    ? `${item.__replied} ${item.__replied === 1 ? 'reply' : 'replies'} received`
+    : null;
 
   return (
     <TouchableOpacity
@@ -178,12 +188,12 @@ function EnqCard({ item, onPress, isLast }) {
       activeOpacity={0.75}
     >
       <View style={[styles.enqAvatar, { backgroundColor: meta.bg }]}>
-        <Text style={[styles.enqAvatarText, { color: meta.color }]}>{initials(customer)}</Text>
+        <Text style={[styles.enqAvatarText, { color: meta.color }]}>{initials(headline)}</Text>
       </View>
 
       <View style={styles.enquiryBody}>
         <View style={styles.enquiryTop}>
-          <Text style={styles.customerName} numberOfLines={1}>{customer}</Text>
+          <Text style={styles.customerName} numberOfLines={1}>{headline}</Text>
           <View style={[styles.statusChip, { backgroundColor: meta.bg }]}>
             <View style={[styles.statusDot, { backgroundColor: meta.color }]} />
             <Text style={[styles.statusText, { color: meta.color }]}>{item.status || 'New'}</Text>
@@ -192,12 +202,26 @@ function EnqCard({ item, onPress, isLast }) {
 
         <View style={styles.enquiryMeta}>
           <Text style={styles.enquiryCode}>{enquiryCode}</Text>
-          <View style={styles.metaDot} />
-          <Icon name="cube-outline" size={11} color={TEXT_MUTED} />
-          <Text style={styles.metaText} numberOfLines={1}>{product}</Text>
+          {isSent ? (
+            <Text style={styles.metaText} numberOfLines={1}>
+              · To {item.__count || 1} recipient{(item.__count || 1) === 1 ? '' : 's'}
+            </Text>
+          ) : (
+            <>
+              <View style={styles.metaDot} />
+              <Icon name="cube-outline" size={11} color={TEXT_MUTED} />
+              <Text style={styles.metaText} numberOfLines={1}>{product}</Text>
+            </>
+          )}
           <View style={styles.metaDot} />
           <Text style={styles.metaText}>Qty {quantity}</Text>
         </View>
+
+        {repliedNote ? (
+          <Text style={{ fontSize: 10, color: '#10b981', fontWeight: '700', marginTop: 2 }}>
+            {repliedNote}
+          </Text>
+        ) : null}
       </View>
 
       <Icon name="chevron-right" size={18} color="#C7CCD6" />
@@ -267,8 +291,17 @@ export default function DashboardScreen({ navigation }) {
         setDashData(dashboardR.value?.data ?? dashboardR.value ?? {});
       }
       if (enquiryR.status === 'fulfilled') {
-        const value = enquiryR.value?.data ?? enquiryR.value;
-        setEnquiries(Array.isArray(value) ? value : []);
+        // Raw backend envelope: `{ success, message, data: { enquiries, pagination } }`.
+        // `enquiryR.value.data` is that wrapper object — NOT the row array — so
+        // unwrap `data.enquiries` first, then the bare shapes. (The same fix as
+        // `hooks/useEnquiries.js`; without it this section is always empty.)
+        const v = enquiryR.value;
+        const list =
+          (Array.isArray(v?.data) ? v.data : null)
+          ?? v?.data?.enquiries
+          ?? v?.enquiries
+          ?? (Array.isArray(v) ? v : []);
+        setEnquiries(Array.isArray(list) ? list : []);
       }
       if (invR.status === 'fulfilled') {
         setInvSummary(invR.value?.data ?? invR.value ?? {});
@@ -313,10 +346,60 @@ export default function DashboardScreen({ navigation }) {
   const monthExpense  = plData.totalExpenses ?? plData.total_expense  ?? 0;
   const monthProfit   = plData.netProfit     ?? plData.net_profit     ?? (monthSales - monthPurchase - monthExpense);
 
-  const enquiryNew       = enquiries.filter(i => i.status === 'New').length;
-  const enquiryActive    = enquiries.filter(i => !['Confirmed', 'Cancelled'].includes(i.status)).length;
-  const enquiryConfirmed = enquiries.filter(i => i.status === 'Confirmed').length;
-  const recentEnquiries  = enquiries.slice(0, 4);
+  // ── Enquiry roll-up ──
+  // A broadcast fans out to ONE ROW PER RECIPIENT sharing a single `enq_code`.
+  // Counting rows would report "11 new" for ONE broadcast sent to 11 parties,
+  // which is misleading — so collapse each broadcast to a single logical
+  // enquiry FIRST, then count. This is the ONE source of truth for both the
+  // summary numbers AND the Recent Enquiries cards, so they always agree.
+  const dedupedEnquiries = (() => {
+    const byCode = new Map();
+    for (const e of enquiries) {
+      const key = e.enq_code || e.enquiry_code || e._id || e.id;
+      if (!byCode.has(key)) byCode.set(key, []);
+      byCode.get(key).push(e);
+    }
+    return [...byCode.values()].map(members => {
+      if (members.length === 1) return members[0];
+      // The broadcast's roll-up status = the FURTHEST-ALONG sibling, so one
+      // answered recipient lifts the whole enquiry out of "New".
+      const RANK = { Cancelled: 0, New: 1, Viewed: 2, Replied: 3, Negotiation: 4, Confirmed: 5 };
+      const status = members
+        .map(m => m.status)
+        .sort((a, b) => (RANK[b] ?? 1) - (RANK[a] ?? 1))[0];
+      // How many recipients have answered (for the "N replies received" note).
+      const replied = members.filter(m =>
+        ['Replied', 'Negotiation', 'Confirmed'].includes(m.status)
+        || !!String(m.distributor_reply || '').trim()
+        || m.available_quantity != null,
+      ).length;
+      const prices = members.map(m => +(m.offered_price || 0)).filter(Boolean);
+      return {
+        ...members[0],
+        __group: true,
+        __count: members.length,
+        __replied: replied,
+        status,
+        offered_price: prices.length ? Math.min(...prices) : members[0].offered_price,
+      };
+    });
+  })();
+
+  // "Active" = anything not yet Confirmed/Cancelled (i.e. still needs attention).
+  // The home screen's headline number, matching the retailer's home.
+  const enquiryNew       = dedupedEnquiries.filter(i => i.status === 'New').length;
+  const enquiryActive    = dedupedEnquiries.filter(i => !['Confirmed', 'Cancelled'].includes(i.status)).length;
+  const enquiryConfirmed = dedupedEnquiries.filter(i => i.status === 'Confirmed').length;
+  const enquiryReplied   = dedupedEnquiries.filter(i => ['Replied', 'Negotiation'].includes(i.status)).length;
+
+  // RECEIVED first (they need our reply), then SENT broadcasts, newest first.
+  // Built from the SAME deduped set the summary counts use, so the numbers and
+  // the cards can never disagree.
+  const recvRows    = dedupedEnquiries.filter(e => e.direction !== 'sent');
+  const sentGrouped = dedupedEnquiries.filter(e => e.direction === 'sent');
+  const recentEnquiries = [...recvRows, ...sentGrouped]
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+    .slice(0, 4);
 
   const companyName = user?.company_name || user?.companyName || 'EzyEnquiry';
 
@@ -529,9 +612,9 @@ export default function DashboardScreen({ navigation }) {
 
           <View style={styles.enquirySummary}>
             {[
-              { label: 'Total',  value: enquiries.length, color: NAVY,      bg: '#EEF1F6' },
+              { label: 'Active', value: enquiryActive,    color: ORANGE,    bg: ORANGE_LT },
               { label: 'New',    value: enquiryNew,        color: '#2563EB', bg: '#EFF6FF' },
-              { label: 'Active', value: enquiryActive,     color: ORANGE,    bg: ORANGE_LT },
+              { label: 'Replied', value: enquiryReplied,   color: '#7C3AED', bg: '#F5F3FF' },
               { label: 'Done',   value: enquiryConfirmed,  color: '#059669', bg: '#ECFDF5' },
             ].map(item => (
               <View key={item.label} style={[styles.enquirySummaryItem, { backgroundColor: item.bg }]}>

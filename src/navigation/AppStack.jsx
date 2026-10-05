@@ -22,7 +22,7 @@ function guard(moduleKey, Component) {
 
 // ── Enquiry ──────────────────────────────────────────────────
 import EnquiryDetailScreen      from '../screens/enquiry/EnquiryDetailScreen';
-import ReplyEnquiryScreen       from '../screens/enquiry/ReplyEnquiryScreen';
+import CreateEnquiryScreen      from '../screens/enquiry/CreateEnquiryScreen';
 
 // ── Orders ───────────────────────────────────────────────────
 import OrderListScreen          from '../screens/order/OrderListScreen';
@@ -118,8 +118,10 @@ export default function AppStack() {
       <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
 
       {/* ── Enquiry ── */}
-      <Stack.Screen name="EnquiryDetail"     component={guard('enquiries', EnquiryDetailScreen)}     options={{ ...H, title: 'Enquiry Detail' }} />
-      <Stack.Screen name="ReplyEnquiry"      component={guard('enquiries', ReplyEnquiryScreen)}      options={{ ...H, title: 'Reply to Enquiry' }} />
+      <Stack.Screen name="EnquiryDetail"     component={guard('enquiries', EnquiryDetailScreen)}     options={{ headerShown: false }} />
+      {/* A wholesaler may also RAISE a broadcast — it goes to every retailer,
+          every wholesaler and the Admin team (backend `broadcastEnquiry`). */}
+      <Stack.Screen name="CreateEnquiry"     component={guard('enquiries', CreateEnquiryScreen)}     options={{ headerShown: false }} />
 
       {/* ── Orders ── */}
       <Stack.Screen name="OrderList"         component={guard('orders', OrderListScreen)}         options={{ headerShown: false }} />
