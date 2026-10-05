@@ -80,6 +80,10 @@ export default function EnquiryDetailScreen({ navigation, route }) {
   // by these two flags — mirroring EnquiryDetailsScreen.jsx in the retailer app.
   const [showMessage, setShowMessage] = useState(false);
   const [showReply,   setShowReply]   = useState(false);
+  // The enquiry row the inline Message/Reply panels act on. Defaults to the
+  // opened enquiry; a reply card sets it to THAT replier's own row so the
+  // conversation/history stays scoped to that one party.
+  const [activeRowId, setActiveRowId] = useState(null);
   const [modalSending, setModalSending] = useState(false);
 
   // ── Modal message composer ──
@@ -203,9 +207,12 @@ export default function EnquiryDetailScreen({ navigation, route }) {
     };
     setMessages(prev => [...prev, optimistic]);
     setMessageText('');
+    // Target the active row (a specific replier's row when opened from a reply
+    // card), falling back to the opened enquiry.
+    const targetId = activeRowId || enquiryId;
     try {
-      await enquiryService.sendMessage(enquiryId, text, `c${Date.now()}`);
-      const res = await enquiryService.listMessages(enquiryId);
+      await enquiryService.sendMessage(targetId, text, `c${Date.now()}`);
+      const res = await enquiryService.listMessages(targetId);
       const list = Array.isArray(res?.messages) ? res.messages
         : (Array.isArray(res?.data?.messages) ? res.data.messages : []);
       setMessages(list);
@@ -237,10 +244,14 @@ export default function EnquiryDetailScreen({ navigation, route }) {
         unit:               enquiry?.unit || '',
       };
 
+      // Target the active row (a specific replier's row when opened from a reply
+      // card), falling back to the opened enquiry.
+      const targetId = activeRowId || enquiryId;
+
       // 1. Save to reply history (new record every time) — append optimistically.
       let newEntry = null;
       try {
-        const saved = await enquiryService.createReplyHistory(enquiryId, payload);
+        const saved = await enquiryService.createReplyHistory(targetId, payload);
         newEntry = saved?.data ?? saved;
         if (newEntry) {
           setReplyHistory(prev => [...(Array.isArray(prev) ? prev : []), newEntry]);
@@ -249,7 +260,7 @@ export default function EnquiryDetailScreen({ navigation, route }) {
 
       // 2. Update the enquiry itself
       if (isMarketplace) {
-        await enquiryService.sendOffer(enquiryId, {
+        await enquiryService.sendOffer(targetId, {
           unit_price:         parseFloat(modalReplyForm.rate),
           gst_percent:        modalReplyForm.gst ? parseFloat(modalReplyForm.gst) : undefined,
           transport_charge:   modalReplyForm.transport ? parseFloat(modalReplyForm.transport) : 0,
@@ -259,7 +270,7 @@ export default function EnquiryDetailScreen({ navigation, route }) {
           notes:              modalReplyForm.remarks,
         });
       } else {
-        await enquiryService.reply(enquiryId, {
+        await enquiryService.reply(targetId, {
           status:             'Replied',
           offered_price:      parseFloat(modalReplyForm.rate),
           available_quantity: modalReplyForm.available_qty ? parseFloat(modalReplyForm.available_qty) : undefined,
@@ -474,8 +485,11 @@ export default function EnquiryDetailScreen({ navigation, route }) {
             ) : null}
           </View>
 
-          {/* ── Sent To (only for enquiries WE raised) ── */}
-          {!isReceived && enquiry.seller?.name ? (
+          {/* ── Sent To ──
+              Only for a SINGLE-SELLER enquiry we raised. A BROADCAST goes to
+              many recipients, so naming one is misleading — recipients show in
+              the Replies section instead. Suppressed for broadcasts. */}
+          {!isReceived && !enquiry.broadcast_audience && enquiry.seller?.name ? (
             <View style={[styles.detailSection, { backgroundColor: '#fafafa' }]}>
               <Text style={styles.detailSectionLabel}>SENT TO</Text>
               <Text style={styles.detailSenderName}>{enquiry.seller.name}</Text>
@@ -486,11 +500,6 @@ export default function EnquiryDetailScreen({ navigation, route }) {
                     {[enquiry.seller.city, enquiry.seller.state].filter(Boolean).join(', ')}
                   </Text>
                 </View>
-              ) : null}
-              {enquiry.broadcast_audience ? (
-                <Text style={styles.sentToHint}>
-                  Broadcast · sent to all {enquiry.broadcast_audience === 'both' ? 'wholesalers & retailers' : enquiry.broadcast_audience}
-                </Text>
               ) : null}
             </View>
           ) : null}
@@ -606,20 +615,30 @@ export default function EnquiryDetailScreen({ navigation, route }) {
         {/* ══ Replies section (if this is a SENT enquiry with replies) ══ */}
         {repliedList.length > 0 ? (
           <Section title={`Replies (${repliedList.length})`}>
-            {repliedList.map((reply, idx) => (
+            {repliedList.map((reply, idx) => {
+              // Each reply card targets THAT replier's own enquiry row id, so the
+              // chat/reply history opened from it is only the conversation with
+              // THAT party — never another recipient's.
+              const rowId = reply.id || reply._id || enquiryId;
+              return (
               <ReplyCard
-                key={reply.id || reply._id || idx}
+                key={rowId || idx}
                 reply={reply}
-                enquiryId={enquiryId}
+                enquiryId={rowId}
                 onReply={() => {
                   setShowMessage(false);
+                  setActiveRowId(rowId);
                   setShowReply(true);
+                  enquiryService.listReplyHistory(rowId)
+                    .then(r => setReplyHistory(r?.data?.replies ?? r?.replies ?? r?.data ?? []))
+                    .catch(() => setReplyHistory([]));
                   scrollToBottomSoon();
                 }}
                 onMessage={() => {
                   setShowReply(false);
+                  setActiveRowId(rowId);
                   setShowMessage(true);
-                  enquiryService.listMessages(enquiryId)
+                  enquiryService.listMessages(rowId)
                     .then(r => setMessages(Array.isArray(r?.messages) ? r.messages
                       : (Array.isArray(r?.data?.messages) ? r.data.messages : [])))
                     .catch(() => setMessages([]));
@@ -627,7 +646,8 @@ export default function EnquiryDetailScreen({ navigation, route }) {
                 }}
                 navigation={navigation}
               />
-            ))}
+              );
+            })}
           </Section>
         ) : null}
 
@@ -655,6 +675,7 @@ export default function EnquiryDetailScreen({ navigation, route }) {
                     onPress={() => {
                       if (!canAct) return;
                       setShowReply(false);
+                      setActiveRowId(enquiryId);
                       const willOpen = !showMessage;
                       setShowMessage(willOpen);
                       if (willOpen) {
@@ -677,6 +698,7 @@ export default function EnquiryDetailScreen({ navigation, route }) {
                     onPress={() => {
                       if (!canAct) return;
                       setShowMessage(false);
+                      setActiveRowId(enquiryId);
                       const willOpen = !showReply;
                       setShowReply(willOpen);
                       if (willOpen) {
