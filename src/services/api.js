@@ -17,9 +17,11 @@ import { getToken, removeToken } from '../utils/storage';
 // Using localhost over USB (`adb reverse tcp:5000 tcp:5000`). This is reliable
 // even when the WiFi router has AP/client isolation enabled (which blocks
 // phone → PC traffic over WiFi, e.g. 192.168.1.38 was unreachable).
+// Production backend (Render) — used for installable APK builds so the app
+// works on any device over the internet (no PC/localhost dependency).
 export const BASE_URL = 'https://ezyenquiry-backend.onrender.com/api';
-// export const BASE_URL = 'http://192.168.1.38:5000/api';  // WiFi IP — needs router without AP isolation
-// export const BASE_URL = 'https://ezyenquiry-backend.onrender.com/api';
+// export const BASE_URL = 'http://localhost:5000/api';          // local USB (adb reverse)
+// export const BASE_URL = 'http://192.168.1.38:5000/api';       // local WiFi IP
 
 const TIMEOUT_MS = 20000; // 20s — generous for slow mobile networks
 

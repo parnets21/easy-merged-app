@@ -1,0 +1,217 @@
+import React, { useState, useCallback, useEffect } from 'react';
+import {
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  StatusBar, RefreshControl, ActivityIndicator, TextInput,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Colors } from '../../theme/colors';
+import { Typography } from '../../theme/typography';
+import { Spacing, BorderRadius } from '../../theme/spacing';
+import OrderCard from '../../components/order/OrderCard';
+import EmptyState from '../../components/common/EmptyState';
+import { orderApi, notificationApi } from '../../utils/api';
+import { SCREENS } from '../../constants';
+
+const TABS = ['All', 'New', 'Accepted', 'Packing', 'Dispatched', 'Out for Delivery', 'Delivered', 'Cancelled'];
+const TAB_LABELS = { 'Out for Delivery': 'On Way' };
+
+function mapOrder(o) {
+  return {
+    id: o.id,
+    orderCode: o.order_code,
+    productName: o.product?.name || o.product_name || '',
+    productCode: o.product?.code || '',
+    quantity: o.qty,
+    dispatchedQty: o.dispatched_qty ?? o.qty_dispatched ?? 0,
+    unit: o.unit,
+    unitPrice: o.unit_price,
+    subtotal: o.amount,
+    gst: o.gst_amount,
+    gstPercent: o.gst_percent,
+    deliveryCharges: (o.charges?.transport || 0) + (o.charges?.packing || 0) + (o.charges?.other || 0),
+    total: o.total_amount,
+    status: o.status,
+    internalStatus: o.internal_status,
+    paymentStatus: o.payment_status || null,
+    invoiceNumber: o.invoice_number || '',
+    expectedDelivery: o.expected_delivery || null,
+    deliveryAddress: o.delivery_address || '',
+    seller: o.seller ? { name: o.seller.name, location: [o.seller.city, o.seller.state].filter(Boolean).join(', ') } : null,
+    enquiryCode: o.enquiry_code || '',
+    createdAt: o.created_at,
+    orderDate: o.created_at,
+    statusHistory: o.status_history || [],
+    _raw: o,
+  };
+}
+
+export default function OrdersScreen({ navigation }) {
+  const [activeTab, setActiveTab]   = useState('All');
+  const [orders, setOrders]         = useState([]);
+  const [search, setSearch]         = useState('');
+  const [loading, setLoading]       = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError]           = useState('');
+  const [unread, setUnread]         = useState(0);
+
+  const load = useCallback(async (tab = 'All') => {
+    setError('');
+    try {
+      const params = tab !== 'All' ? { status: tab, limit: 100 } : { limit: 100 };
+      const data = await orderApi.list(params);
+      setOrders((data?.orders || []).map(mapOrder));
+    } catch (err) {
+      setError(err.message || 'Could not load orders.');
+    }
+  }, []);
+
+  const loadUnread = useCallback(async () => {
+    try {
+      const data = await notificationApi.list({ unread: 'true', limit: 1 });
+      setUnread(data?.unread_count || 0);
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => {
+    (async () => { setLoading(true); await Promise.all([load(activeTab), loadUnread()]); setLoading(false); })();
+  }, [load, loadUnread, activeTab]);
+
+  const onRefresh = async () => { setRefreshing(true); await Promise.all([load(activeTab), loadUnread()]); setRefreshing(false); };
+  const onTabChange = (tab) => { setActiveTab(tab); setLoading(true); load(tab).then(() => setLoading(false)); };
+
+  // Client-side search over order code / product / enquiry code.
+  const q = search.trim().toLowerCase();
+  const visibleOrders = q
+    ? orders.filter(o =>
+        (o.orderCode || '').toLowerCase().includes(q) ||
+        (o.productName || '').toLowerCase().includes(q) ||
+        (o.enquiryCode || '').toLowerCase().includes(q))
+    : orders;
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          {navigation.canGoBack() && (
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="arrow-back" size={22} color="#FFF" />
+            </TouchableOpacity>
+          )}
+          <Ionicons name="cube-outline" size={20} color="#FFF" style={styles.headerIcon} />
+          <Text style={styles.headerTitle}>My Orders</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <Text style={styles.headerCount}>{orders.length} total</Text>
+          <TouchableOpacity style={styles.notifBtn} onPress={() => navigation.navigate(SCREENS.NOTIFICATIONS)}>
+            <Ionicons name="notifications-outline" size={22} color="#FFF" />
+            {unread > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text></View>}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Search */}
+      <View style={styles.searchWrap}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={18} color={Colors.textTertiary} />
+          <TextInput
+            style={styles.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search order, product, enquiry…"
+            placeholderTextColor={Colors.textTertiary}
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Tabs */}
+      <View style={styles.tabsWrapper}>
+        <FlatList
+          data={TABS}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabs}
+          keyExtractor={t => t}
+          renderItem={({ item }) => {
+            const active = activeTab === item;
+            return (
+              <TouchableOpacity style={[styles.tab, active && styles.tabActive]} onPress={() => onTabChange(item)}>
+                <Text style={[styles.tabText, active && styles.tabTextActive]}>{TAB_LABELS[item] || item}</Text>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      </View>
+
+      {loading ? (
+        <View style={styles.center}><ActivityIndicator color={Colors.primary} /><Text style={styles.loadingText}>Loading orders…</Text></View>
+      ) : error ? (
+        <View style={styles.center}>
+          <Ionicons name="cloud-offline-outline" size={40} color={Colors.textTertiary} />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={onRefresh}><Text style={styles.retryText}>Tap to retry</Text></TouchableOpacity>
+        </View>
+      ) : visibleOrders.length === 0 ? (
+        <EmptyState
+          iconName="cube-outline"
+          title={q ? 'No matches' : 'No Orders'}
+          message={q
+            ? `No orders match “${search.trim()}”.`
+            : `You have no ${activeTab !== 'All' ? (TAB_LABELS[activeTab] || activeTab).toLowerCase() + ' ' : ''}orders yet.`}
+          buttonTitle={q ? undefined : 'EXPLORE PRODUCTS'}
+          onButtonPress={q ? undefined : () => navigation.navigate(SCREENS.SEARCH)}
+        />
+      ) : (
+        <FlatList
+          data={visibleOrders}
+          keyExtractor={i => i.id}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+          renderItem={({ item }) => (
+            <OrderCard
+              order={item}
+              onPress={() => navigation.navigate(SCREENS.ORDER_DETAILS, { orderId: item.id })}
+              onTrack={() => navigation.navigate(SCREENS.ORDER_TRACKING, { orderId: item.id })}
+            />
+          )}
+        />
+      )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: Colors.background },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.screenPadding, paddingVertical: Spacing.base, backgroundColor: Colors.secondary },
+  headerLeft: { flexDirection: 'row', alignItems: 'center' },
+  backBtn: { marginRight: 8 },
+  headerIcon: { marginRight: 8 },
+  headerTitle: { ...Typography.h4, color: '#FFF' },
+  headerCount: { ...Typography.caption, color: 'rgba(255,255,255,0.6)' },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  notifBtn: { position: 'relative', padding: 4 },
+  badge: { position: 'absolute', top: 0, right: 0, backgroundColor: Colors.primary, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: Colors.secondary },
+  badgeText: { color: Colors.white, fontSize: 9, fontWeight: '800' },
+  searchWrap: { backgroundColor: Colors.white, paddingHorizontal: Spacing.screenPadding, paddingTop: 10 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.background, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 12, height: 42 },
+  searchInput: { flex: 1, ...Typography.body2, color: Colors.textPrimary, paddingVertical: 0 },
+  tabsWrapper: { backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.borderLight },
+  tabs: { paddingHorizontal: Spacing.screenPadding, paddingVertical: 10, gap: 6 },
+  tab: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: BorderRadius.chip, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.white },
+  tabActive: { borderColor: Colors.secondary, backgroundColor: Colors.secondary },
+  tabText: { ...Typography.caption, color: Colors.textSecondary, fontWeight: '500' },
+  tabTextActive: { color: Colors.white, fontWeight: '700' },
+  list: { padding: Spacing.screenPadding, paddingBottom: 90 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
+  loadingText: { ...Typography.body2, color: Colors.textSecondary },
+  errorText: { ...Typography.body2, color: Colors.textSecondary, textAlign: 'center' },
+  retryText: { ...Typography.body2, color: Colors.primary, fontWeight: '700' },
+});
