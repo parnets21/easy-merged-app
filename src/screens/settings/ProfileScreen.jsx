@@ -17,6 +17,7 @@ import PrimaryButton  from '../../components/PrimaryButton';
 import useAuth        from '../../hooks/useAuth';
 import { authService } from '../../services/authService';
 import { theme } from '../../utils/theme';
+import { useExitToLogin } from '../../shared/ExitToLoginContext';
 
 /* ── Menu rows in the profile page ── */
 const MENU_SECTIONS = [
@@ -75,12 +76,20 @@ function MenuRow({ icon, label, color, onPress, isLast }) {
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout, refreshUser } = useAuth();
+  const exitToLogin = useExitToLogin();
 
   const [name,         setName]         = useState(user?.name    || '');
   const [email,        setEmail]        = useState(user?.email   || '');
   const [editMode,     setEditMode]     = useState(false);
   const [saving,       setSaving]       = useState(false);
   const [logoutDialog, setLogoutDialog] = useState(false);
+
+  const handleLogout = async () => {
+    setLogoutDialog(false);
+    await logout();
+    // Return to the SINGLE shared login screen (not the wholesaler AuthStack).
+    exitToLogin();
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -268,7 +277,7 @@ export default function ProfileScreen({ navigation }) {
         visible={logoutDialog}
         title="Logout"
         message="Are you sure you want to logout?"
-        onConfirm={logout}
+        onConfirm={handleLogout}
         onCancel={() => setLogoutDialog(false)}
         danger
       />

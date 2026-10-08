@@ -18,9 +18,12 @@ import PrivacyPolicyScreen   from '../screens/auth/PrivacyPolicyScreen';
 
 const Stack = createNativeStackNavigator();
 
-export default function AuthStack() {
+export default function AuthStack({ initialRouteName }) {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      initialRouteName={initialRouteName || 'Splash'}
+      screenOptions={{ headerShown: false }}
+    >
       {/* 1. Splash — shows logo, auto-navigates after 2.5s */}
       <Stack.Screen name="Splash"          component={SplashScreen} />
 

@@ -14,9 +14,10 @@ import EmptyState from '../../components/common/EmptyState';
 import { formatDate, formatCurrency } from '../../utils/formatters';
 import { getQuotationStatusLabel } from '../../utils/statusHelpers';
 import { enquiryApi, notificationApi } from '../../utils/api';
+import { goToSearch } from '../../utils/navigation';
 import { SCREENS } from '../../constants';
 
-const TABS = ['All', 'New', 'Viewed', 'Replied', 'Negotiation', 'Confirmed', 'Cancelled'];
+const TABS = ['All', 'New', 'Viewed', 'Replied', 'Confirmed', 'Cancelled'];
 
 // Map a backend enquiry into a quotation-shaped record for the retailer.
 function mapQuotation(e) {
@@ -79,7 +80,7 @@ export default function QuotationsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.secondary} />
 
       {/* ── Blue header ─────────────────────────────────── */}
       <View style={styles.header}>
@@ -157,7 +158,7 @@ export default function QuotationsScreen({ navigation }) {
           title="No Quotations"
           message={`You have no ${activeTab !== 'All' ? activeTab.toLowerCase() + ' ' : ''}quotations yet. Send an enquiry to create one.`}
           buttonTitle="SEARCH PRODUCTS"
-          onButtonPress={() => navigation.navigate(SCREENS.SEARCH)}
+          onButtonPress={() => goToSearch(navigation)}
         />
       ) : (
         <FlatList
@@ -233,7 +234,7 @@ const QuotationCard = ({ quotation, onPress, onViewOrder }) => {
 };
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.white },
+  safe: { flex: 1, backgroundColor: Colors.background },
   bodyWrap: { flex: 1, backgroundColor: Colors.background },
   header: {
     backgroundColor: Colors.secondary,

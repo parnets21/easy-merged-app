@@ -195,7 +195,7 @@ export default function DocumentsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.secondary} />
       <AppHeader title="Documents" showBack onBack={() => navigation.goBack()} centerTitle />
 
       <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
@@ -324,7 +324,7 @@ const StatusLine = ({ status, rejectReason }) => {
 };
 
 const st = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F2F4F7' },
+  safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { padding: 16 },
 
   /* Progress card */

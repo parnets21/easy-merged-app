@@ -1,7 +1,8 @@
 // src/screens/auth/RegistrationScreen.jsx
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Alert,
+  BackHandler,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -12,17 +13,33 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FormField from '../../components/FormField';
 import PrimaryButton from '../../components/PrimaryButton';
 import { authService } from '../../services/authService';
 import { validateMobile, validateRequired } from '../../utils/validators';
 import { theme } from '../../utils/theme';
 import { setRegStep } from '../../utils/storage';
+import { checkOppositeRegistration, RoleDetectNetworkError } from '../../shared/roleDetect';
+import { useExitToLogin } from '../../shared/ExitToLoginContext';
 
 const LOGO = require('../../assets/logo.png');
 
 export default function RegistrationScreen({ route, navigation }) {
   const prefilledMobile = route?.params?.mobile ?? '';
+  const exitToLogin = useExitToLogin();
+  const insets = useSafeAreaInsets();
+
+  // Back from registration returns to the SHARED login screen — never closes
+  // the app and never jumps to the wholesaler's own Login/Welcome.
+  useFocusEffect(
+    useCallback(() => {
+      const onBack = () => { exitToLogin(); return true; };
+      const sub = BackHandler.addEventListener('hardwareBackPress', onBack);
+      return () => sub.remove();
+    }, [exitToLogin]),
+  );
 
   const [form, setForm] = useState({
     companyName: '', ownerName: '', mobile: prefilledMobile,
@@ -50,6 +67,26 @@ export default function RegistrationScreen({ route, navigation }) {
 
     setLoading(true);
     try {
+      // Enforce one-number-one-role: block if this mobile is already a Retailer.
+      try {
+        const { blocked } = await checkOppositeRegistration(form.mobile, 'wholesaler');
+        if (blocked) {
+          setLoading(false);
+          Alert.alert(
+            'Number Already Registered',
+            'This mobile number is already registered as a Retailer. Please use a different number, or sign in as a Retailer.'
+          );
+          return;
+        }
+      } catch (guardErr) {
+        if (guardErr instanceof RoleDetectNetworkError) {
+          setLoading(false);
+          Alert.alert('Please Try Again', 'Could not verify your number right now (server waking up). Please try again in a moment.');
+          return;
+        }
+        // Non-network error — fall through and let registration proceed.
+      }
+
       // Step 1 — Create company + user (backend returns a unique company code).
       // Business type is no longer collected from the user — default to
       // 'Wholesaler' so the backend (which still expects the field) accepts it.
@@ -100,8 +137,15 @@ export default function RegistrationScreen({ route, navigation }) {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 48 }]}>
           <View style={styles.circleDecor} />
+          <TouchableOpacity
+            style={[styles.backBtn, { top: insets.top + 10 }]}
+            onPress={exitToLogin}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.backArrow}>←</Text>
+          </TouchableOpacity>
           <View style={styles.logoBox}>
             <Image source={LOGO} style={styles.logoImage} resizeMode="contain" />
           </View>
@@ -158,15 +202,14 @@ export default function RegistrationScreen({ route, navigation }) {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Login')}
-            style={styles.loginLink}
-          >
+          {/* Already registered → shared login */}
+          <TouchableOpacity onPress={exitToLogin} style={styles.loginLink}>
             <Text style={styles.loginLinkText}>
               Already registered?{'  '}
               <Text style={styles.loginLinkBold}>Login here</Text>
             </Text>
           </TouchableOpacity>
+
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -182,6 +225,13 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 36, borderBottomRightRadius: 36,
     overflow: 'hidden',
   },
+  backBtn: {
+    position: 'absolute', left: 16, zIndex: 2,
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  backArrow: { color: '#FFF', fontSize: 22, fontWeight: '700', marginTop: -2 },
   circleDecor: {
     position: 'absolute', top: -60, right: -60,
     width: 200, height: 200, borderRadius: 100,

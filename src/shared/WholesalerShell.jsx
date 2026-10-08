@@ -23,6 +23,7 @@ import {
 import { AuthProvider, AuthContext } from '../context/AuthContext';
 import RootNavigator from '../navigation/RootNavigator';
 import { theme } from '../utils/theme';
+import { ExitToLoginProvider } from './ExitToLoginContext';
 
 const NAV_THEME = {
   dark: false,
@@ -92,18 +93,12 @@ function ApprovalSuccessModal() {
 }
 
 export default function WholesalerShell() {
-  const { intent } = useAppMode();
+  const { resetMode } = useAppMode();
   const navRef = useRef(null);
 
-  // When the user chose "Wholesaler Register", deep-link to the wholesaler
-  // app's Registration screen once the navigator is ready (after its Splash).
-  const onReady = () => {
-    if (intent === 'register') {
-      setTimeout(() => {
-        try { navRef.current?.navigate('Registration'); } catch (_) {}
-      }, 3400);
-    }
-  };
+  // Register deep-linking is handled by RootNavigator starting AuthStack on the
+  // Registration screen directly (no Splash flash), so no onReady hop is needed.
+  const onReady = () => {};
 
   useEffect(() => {
     const msgInstance = getMessaging();
@@ -134,13 +129,15 @@ export default function WholesalerShell() {
   }, []);
 
   return (
-    <AuthProvider>
-      <NavigationContainer theme={NAV_THEME} ref={navRef} onReady={onReady}>
-        <StatusBar barStyle="light-content" backgroundColor={theme.colors.splashBg} translucent={false} />
-        <RootNavigator />
-        <ApprovalSuccessModal />
-      </NavigationContainer>
-    </AuthProvider>
+    <ExitToLoginProvider onExit={resetMode}>
+      <AuthProvider>
+        <NavigationContainer theme={NAV_THEME} ref={navRef} onReady={onReady}>
+          <StatusBar barStyle="light-content" backgroundColor={theme.colors.splashBg} translucent={false} />
+          <RootNavigator />
+          <ApprovalSuccessModal />
+        </NavigationContainer>
+      </AuthProvider>
+    </ExitToLoginProvider>
   );
 }
 

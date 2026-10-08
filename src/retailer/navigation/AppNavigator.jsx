@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -10,6 +10,8 @@ import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Shadows } from '../theme/spacing';
 import { SCREENS } from '../constants';
+import { setNavigationRef } from '../services/pushNotificationService';
+import { useAuth } from '../context/AuthContext';
 
 // Auth Screens
 import SplashScreen from '../screens/auth/SplashScreen';
@@ -18,68 +20,96 @@ import RegisterScreen from '../screens/auth/RegisterScreen';
 import OTPScreen from '../screens/auth/OTPScreen';
 import PendingApprovalScreen from '../screens/auth/PendingApprovalScreen';
 
-// Main Tab Screens
+// Main Tab Screens — mirrors the wholesaler's BottomTabNavigator:
+// Home · Enquiries · Products · Sales · Profile
 import HomeScreen from '../screens/home/HomeScreen';
-import SearchScreen from '../screens/products/SearchScreen';
 import EnquiriesScreen from '../screens/enquiries/EnquiriesScreen';
-import OrdersScreen from '../screens/orders/OrdersScreen';
+import MyProductsScreen from '../screens/products/MyProductsScreen';
+import SalesListScreen from '../screens/erp/SalesListScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+
+// Search + Orders are no longer tabs (the wholesaler has neither) but stay
+// registered so Home can still reach them.
+import SearchScreen from '../screens/products/SearchScreen';
+import OrdersScreen from '../screens/orders/OrdersScreen';
 
 // Product Screens
 import ProductDetailsScreen from '../screens/products/ProductDetailsScreen';
-import SearchResultsScreen from '../screens/products/SearchResultsScreen';
 import AddProductScreen from '../screens/products/AddProductScreen';
-import MyProductsScreen from '../screens/products/MyProductsScreen';
+import CategoriesBrandsScreen from '../screens/products/CategoriesBrandsScreen';
 
 // Enquiry Screens
-import CreateEnquiryScreen from '../screens/enquiries/CreateEnquiryScreen';
-import EnquirySuccessScreen from '../screens/enquiries/EnquirySuccessScreen';
 import EnquiryDetailsScreen from '../screens/enquiries/EnquiryDetailsScreen';
-import NegotiationScreen from '../screens/enquiries/NegotiationScreen';
+import CreateEnquiryScreen  from '../screens/enquiries/CreateEnquiryScreen';
+
+// Quotation Screens
+import QuotationsScreen from '../screens/quotations/QuotationsScreen';
 import QuotationConfirmScreen from '../screens/enquiries/QuotationConfirmScreen';
 
 // Order Screens
-import OrderConfirmationScreen from '../screens/orders/OrderConfirmationScreen';
-import OrderSuccessScreen from '../screens/orders/OrderSuccessScreen';
 import OrderDetailsScreen from '../screens/orders/OrderDetailsScreen';
-import OrderTrackingScreen from '../screens/orders/OrderTrackingScreen';
-import DispatchDetailsScreen from '../screens/orders/DispatchDetailsScreen';
-import DeliveryOTPScreen from '../screens/orders/DeliveryOTPScreen';
+import OrderSuccessScreen from '../screens/orders/OrderSuccessScreen';
 
 // Invoice Screens
 import InvoicesScreen from '../screens/invoices/InvoicesScreen';
 import InvoiceDetailsScreen from '../screens/invoices/InvoiceDetailsScreen';
 
-// Quotation Screens
-import QuotationsScreen from '../screens/quotations/QuotationsScreen';
-
 // Notification Screen
 import NotificationsScreen from '../screens/notifications/NotificationsScreen';
 
 // Profile Screens
-import CompanyDetailsScreen from '../screens/profile/CompanyDetailsScreen';
-import DocumentsScreen from '../screens/profile/DocumentsScreen';
 import SubscriptionScreen from '../screens/profile/SubscriptionScreen';
-import {
-  NotificationSettingsScreen,
-  ChangePasswordScreen,
-  HelpSupportScreen,
-} from '../screens/profile/SettingsScreen';
+import CompanyDetailsScreen from '../screens/profile/CompanyDetailsScreen';
+import DocumentsScreen from '../screens/profile/DocumentsScreen';        // KYC verification
+import { NotificationSettingsScreen, HelpSupportScreen } from '../screens/profile/SettingsScreen';
+import SupplierListScreen from '../screens/erp/SupplierListScreen';
 
 // Staff Management Screens
 import StaffListScreen    from '../screens/staff/StaffListScreen';
 import AddEditStaffScreen from '../screens/staff/AddEditStaffScreen';
 
+// ── ERP Screens (wholesaler parity) ──────────────────────────────────────────
+// NOTE: SalesListScreen is imported above — it is the "Sales" bottom tab.
+import SalesEntryScreen   from '../screens/erp/SalesEntryScreen';
+import SalesReportScreen  from '../screens/erp/SalesReportScreen';
+import ExpenseListScreen   from '../screens/erp/ExpenseListScreen';
+import ExpenseEntryScreen  from '../screens/erp/ExpenseEntryScreen';
+import ExpenseReportScreen from '../screens/erp/ExpenseReportScreen';
+import ProfitLossScreen    from '../screens/erp/ProfitLossScreen';
+import InventoryScreen     from '../screens/erp/InventoryScreen';
+import StockAdjustScreen   from '../screens/erp/StockAdjustScreen';
+import StockTransferScreen from '../screens/erp/StockTransferScreen';
+import WarehouseListScreen from '../screens/erp/WarehouseListScreen';
+import PurchaseListScreen  from '../screens/erp/PurchaseListScreen';
+import PurchaseEntryScreen from '../screens/erp/PurchaseEntryScreen';
+import { PaymentReceivableScreen, PaymentPayableScreen } from '../screens/erp/PaymentListScreen';
+import AccountsScreen      from '../screens/erp/AccountsScreen';
+import PartyLedgerScreen   from '../screens/erp/PartyLedgerScreen';
+import CustomerListScreen  from '../screens/erp/CustomerListScreen';
+import LeadListScreen      from '../screens/erp/LeadListScreen';
+import ReportCenterScreen  from '../screens/erp/ReportCenterScreen';
+import AnalyticsScreen     from '../screens/erp/AnalyticsScreen';
+import DispatchTrackingScreen from '../screens/erp/DispatchTrackingScreen';
+import DispatchEntryScreen    from '../screens/erp/DispatchEntryScreen';
+import DocumentRepositoryScreen from '../screens/erp/DocumentRepositoryScreen';
+
+// ── Tools (client-side, no backend) ──────────────────────────────────────────
+import StoneCalculationScreen from '../screens/tools/StoneCalculationScreen';
+
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // ─── Tab Icons ─────────────────────────────────────────────────────────────────
+// Mirrors wholesalerapp/src/navigation/BottomTabNavigator.jsx (lines 69-75):
+// Home · Enquiries · Products · Sales · Profile.
+// The wholesaler uses MaterialCommunityIcons names; these are the Ionicons
+// equivalents — see SKILL.md → "Icon name translation".
 const TAB_CONFIG = {
-  HomeTab:             { icon: 'home-outline',           iconActive: 'home',             label: 'Home' },
-  [SCREENS.SEARCH]:    { icon: 'search-outline',    iconActive: 'search',           label: 'Search' },
-  [SCREENS.ENQUIRIES]: { icon: 'document-text-outline', iconActive: 'document-text', label: 'Quotations' },
-  [SCREENS.ORDERS]:    { icon: 'cube-outline',      iconActive: 'cube',             label: 'Orders' },
-  [SCREENS.PROFILE]:   { icon: 'person-outline',    iconActive: 'person',           label: 'Profile' },
+  HomeTab:              { icon: 'home-outline',               iconActive: 'home',               label: 'Home' },
+  [SCREENS.ENQUIRIES]:  { icon: 'chatbubble-ellipses-outline', iconActive: 'chatbubble-ellipses', label: 'Enquiries' },
+  [SCREENS.MY_PRODUCTS]:{ icon: 'cube-outline',               iconActive: 'cube',               label: 'Products' },
+  [SCREENS.SALES_LIST]: { icon: 'cash-outline',               iconActive: 'cash',               label: 'Sales' },
+  [SCREENS.PROFILE]:    { icon: 'person-outline',             iconActive: 'person',             label: 'Profile' },
 };
 
 // ─── Custom Tab Bar ─────────────────────────────────────────────────────────────
@@ -128,24 +158,75 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
 };
 
 // ─── Main Bottom Tabs ───────────────────────────────────────────────────────────
+// Same five tabs as the wholesaler. Search and Orders moved out of the bar and
+// are now plain stack screens (still reachable from Home).
 const MainTabs = () => (
   <Tab.Navigator
     tabBar={props => <CustomTabBar {...props} />}
     screenOptions={{ headerShown: false }}
   >
-    <Tab.Screen name="HomeTab"           component={HomeScreen} />
-    <Tab.Screen name={SCREENS.SEARCH}    component={SearchScreen} />
-    <Tab.Screen name={SCREENS.ENQUIRIES} component={EnquiriesScreen} />
-    <Tab.Screen name={SCREENS.ORDERS}    component={OrdersScreen} />
-    <Tab.Screen name={SCREENS.PROFILE}   component={ProfileScreen} />
+    <Tab.Screen name="HomeTab"              component={HomeScreen} />
+    <Tab.Screen name={SCREENS.ENQUIRIES}    component={EnquiriesScreen} />
+    <Tab.Screen name={SCREENS.MY_PRODUCTS}  component={MyProductsScreen} />
+    <Tab.Screen name={SCREENS.SALES_LIST}   component={SalesListScreen} />
+    <Tab.Screen name={SCREENS.PROFILE}      component={ProfileScreen} />
   </Tab.Navigator>
 );
 
 // ─── Root Stack ─────────────────────────────────────────────────────────────────
-const AppNavigator = React.forwardRef((props, ref) => (
-  <NavigationContainer ref={ref} onReady={props?.onReady}>
+export const navigationRef = React.createRef();
+
+/**
+ * Reactive auth gate.
+ *
+ * SplashScreen decides the initial route ONCE at startup, so it cannot react to
+ * a session dying later (expired JWT → global 401 handler in `api.js` clears the
+ * session and nulls the user). Without this, the app would stay on the
+ * authenticated stack with a dead token and every request would fail with
+ * "Invalid or expired token".
+ *
+ * When `user` transitions from set → null while the user is past the auth
+ * screens, reset the stack to Login.
+ */
+function useSessionGate() {
+  const { user } = useAuth();
+  const wasLoggedIn = useRef(false);
+
+  useEffect(() => {
+    if (user) {
+      wasLoggedIn.current = true;
+      return;
+    }
+    // Only bounce if we were previously signed in — otherwise this would fight
+    // the normal startup flow (Splash → Login) and the logout button itself.
+    if (!wasLoggedIn.current) return;
+    wasLoggedIn.current = false;
+
+    const nav = navigationRef.current;
+    if (!nav?.isReady?.()) return;
+
+    const current = nav.getCurrentRoute?.()?.name;
+    // Already on an auth screen (e.g. the user pressed Logout) — nothing to do.
+    const AUTH_ROUTES = [
+      SCREENS.SPLASH, SCREENS.LOGIN, SCREENS.REGISTER, SCREENS.PENDING_APPROVAL,
+    ];
+    if (AUTH_ROUTES.includes(current)) return;
+
+    nav.reset({ index: 0, routes: [{ name: SCREENS.LOGIN }] });
+  }, [user]);
+}
+
+const AppNavigator = React.forwardRef((props, ref) => {
+  useSessionGate();
+  const handleReady = () => {
+    setNavigationRef(ref || navigationRef);
+    // Let the merged-app shell run its own onReady (e.g. deep-link to Register).
+    if (typeof props?.onReady === 'function') props.onReady();
+  };
+  return (
+    <NavigationContainer ref={ref || navigationRef} onReady={handleReady}>
     <Stack.Navigator
-      initialRouteName={SCREENS.SPLASH}
+      initialRouteName={props?.initialRoute || SCREENS.SPLASH}
       screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
     >
       {/* Auth */}
@@ -160,13 +241,17 @@ const AppNavigator = React.forwardRef((props, ref) => (
 
       {/* Products */}
       <Stack.Screen
+        name={SCREENS.SEARCH}
+        component={SearchScreen}
+      />
+      <Stack.Screen
         name={SCREENS.PRODUCT_DETAILS}
         component={ProductDetailsScreen}
         options={{ animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
-        name={SCREENS.SEARCH_RESULTS}
-        component={SearchResultsScreen}
+        name={SCREENS.CATEGORIES_BRANDS}
+        component={CategoriesBrandsScreen}
       />
       <Stack.Screen
         name={SCREENS.ADD_PRODUCT}
@@ -179,45 +264,38 @@ const AppNavigator = React.forwardRef((props, ref) => (
       />
 
       {/* Enquiries */}
-      <Stack.Screen name={SCREENS.CREATE_ENQUIRY}    component={CreateEnquiryScreen} />
-      <Stack.Screen
-        name={SCREENS.ENQUIRY_SUCCESS}
-        component={EnquirySuccessScreen}
-        options={{ animation: 'fade', gestureEnabled: false }}
-      />
       <Stack.Screen name={SCREENS.ENQUIRY_DETAILS}  component={EnquiryDetailsScreen} />
-      <Stack.Screen name={SCREENS.NEGOTIATION}      component={NegotiationScreen} />
-      <Stack.Screen name={SCREENS.QUOTATION_CONFIRM} component={QuotationConfirmScreen} />
+      <Stack.Screen
+        name={SCREENS.CREATE_ENQUIRY}
+        component={CreateEnquiryScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+
+      {/* Quotations */}
+      <Stack.Screen name={SCREENS.QUOTATIONS}          component={QuotationsScreen} />
+      <Stack.Screen name={SCREENS.QUOTATION_CONFIRM}   component={QuotationConfirmScreen} />
 
       {/* Orders */}
-      <Stack.Screen name={SCREENS.ORDER_CONFIRMATION} component={OrderConfirmationScreen} />
-      <Stack.Screen
-        name={SCREENS.ORDER_SUCCESS}
-        component={OrderSuccessScreen}
-        options={{ animation: 'fade', gestureEnabled: false }}
-      />
+      <Stack.Screen name={SCREENS.ORDERS}          component={OrdersScreen} />
       <Stack.Screen name={SCREENS.ORDER_DETAILS}   component={OrderDetailsScreen} />
-      <Stack.Screen name={SCREENS.ORDER_TRACKING}  component={OrderTrackingScreen} />
-      <Stack.Screen name={SCREENS.DISPATCH_DETAILS} component={DispatchDetailsScreen} />
-      <Stack.Screen name={SCREENS.DELIVERY_OTP}    component={DeliveryOTPScreen} />
+      <Stack.Screen name={SCREENS.ORDER_SUCCESS}   component={OrderSuccessScreen} />
 
       {/* Invoices & Payments */}
       <Stack.Screen name={SCREENS.INVOICES}         component={InvoicesScreen} />
       <Stack.Screen name={SCREENS.INVOICE_DETAILS}  component={InvoiceDetailsScreen} />
 
-      {/* Quotations */}
-      <Stack.Screen name={SCREENS.QUOTATIONS}       component={QuotationsScreen} />
-
       {/* Notifications */}
       <Stack.Screen name={SCREENS.NOTIFICATIONS}   component={NotificationsScreen} />
 
       {/* Profile */}
+      <Stack.Screen name={SCREENS.SUBSCRIPTION}           component={SubscriptionScreen} />
       <Stack.Screen name={SCREENS.COMPANY_DETAILS}        component={CompanyDetailsScreen} />
       <Stack.Screen name={SCREENS.DOCUMENTS}              component={DocumentsScreen} />
-      <Stack.Screen name={SCREENS.SUBSCRIPTION}           component={SubscriptionScreen} />
       <Stack.Screen name={SCREENS.NOTIFICATION_SETTINGS}  component={NotificationSettingsScreen} />
-      <Stack.Screen name={SCREENS.CHANGE_PASSWORD}        component={ChangePasswordScreen} />
       <Stack.Screen name={SCREENS.HELP_SUPPORT}           component={HelpSupportScreen} />
+      {/* ERP suppliers — reached from the Home dashboard's "More" group. Lives
+          here because its route constant sits in the Profile block. */}
+      <Stack.Screen name={SCREENS.SUPPLIER_LIST}          component={SupplierListScreen} />
 
       {/* Staff Management */}
       <Stack.Screen name={SCREENS.STAFF_LIST}     component={StaffListScreen} />
@@ -226,9 +304,65 @@ const AppNavigator = React.forwardRef((props, ref) => (
         component={AddEditStaffScreen}
         options={{ animation: 'slide_from_bottom' }}
       />
+
+      {/* ── ERP modules (wholesaler parity) ── */}
+      <Stack.Screen name={SCREENS.SALES_LIST}    component={SalesListScreen} />
+      <Stack.Screen name={SCREENS.SALES_REPORT}  component={SalesReportScreen} />
+      <Stack.Screen
+        name={SCREENS.SALES_ENTRY}
+        component={SalesEntryScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+
+      <Stack.Screen name={SCREENS.EXPENSE_LIST}   component={ExpenseListScreen} />
+      <Stack.Screen name={SCREENS.EXPENSE_REPORT} component={ExpenseReportScreen} />
+      <Stack.Screen name={SCREENS.PROFIT_LOSS}    component={ProfitLossScreen} />
+      <Stack.Screen
+        name={SCREENS.EXPENSE_ENTRY}
+        component={ExpenseEntryScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+
+      <Stack.Screen name={SCREENS.INVENTORY}      component={InventoryScreen} />
+      <Stack.Screen name={SCREENS.WAREHOUSE_LIST} component={WarehouseListScreen} />
+      <Stack.Screen name={SCREENS.STOCK_TRANSFER} component={StockTransferScreen} />
+      <Stack.Screen
+        name={SCREENS.STOCK_ADJUST}
+        component={StockAdjustScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+
+      <Stack.Screen name={SCREENS.PURCHASE_LIST} component={PurchaseListScreen} />
+      <Stack.Screen
+        name={SCREENS.PURCHASE_ENTRY}
+        component={PurchaseEntryScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+
+      <Stack.Screen name={SCREENS.PAYMENT_RECEIVABLE} component={PaymentReceivableScreen} />
+      <Stack.Screen name={SCREENS.PAYMENT_PAYABLE}    component={PaymentPayableScreen} />
+      <Stack.Screen name={SCREENS.ACCOUNTS}           component={AccountsScreen} />
+      <Stack.Screen name={SCREENS.CUSTOMER_LEDGER}    component={PartyLedgerScreen} />
+
+      <Stack.Screen name={SCREENS.CUSTOMER_LIST}      component={CustomerListScreen} />
+      <Stack.Screen name={SCREENS.LEAD_LIST}          component={LeadListScreen} />
+      <Stack.Screen name={SCREENS.REPORT_CENTER}      component={ReportCenterScreen} />
+      <Stack.Screen name={SCREENS.ANALYTICS}          component={AnalyticsScreen} />
+
+      <Stack.Screen name={SCREENS.DISPATCH_TRACKING}  component={DispatchTrackingScreen} />
+      <Stack.Screen
+        name={SCREENS.DISPATCH_ENTRY}
+        component={DispatchEntryScreen}
+        options={{ animation: 'slide_from_bottom' }}
+      />
+
+      <Stack.Screen name={SCREENS.DOCUMENT_REPOSITORY} component={DocumentRepositoryScreen} />
+
+      <Stack.Screen name={SCREENS.STONE_CALC}         component={StoneCalculationScreen} />
     </Stack.Navigator>
-  </NavigationContainer>
-));
+    </NavigationContainer>
+  );
+});
 
 // ─── Styles ──────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({

@@ -48,7 +48,7 @@ export default function PendingApprovalScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.secondary} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Icon */}
@@ -156,7 +156,7 @@ const Step = ({ icon, text, last }) => (
 );
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
+  safe: { flex: 1, backgroundColor: '#1A2340' },
   scroll: { padding: Spacing.screenPadding, paddingTop: Spacing.xl, paddingBottom: 40, alignItems: 'stretch' },
   iconWrap: { width: 100, height: 100, borderRadius: 50, backgroundColor: Colors.primaryBg, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: Spacing.lg },
   iconWrapError: { backgroundColor: Colors.errorBg },

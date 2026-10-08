@@ -91,7 +91,7 @@ const OTPScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.secondary} />
       <AppHeader title="OTP Verification" showBack onBack={() => navigation.goBack()} centerTitle />
       <KeyboardAvoidingView
         style={styles.flex}
@@ -154,7 +154,7 @@ const OTPScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.white },
+  safe: { flex: 1, backgroundColor: '#1A2340' },
   flex: { flex: 1 },
   container: { flex: 1, alignItems: 'center', padding: Spacing.xl, paddingTop: Spacing['2xl'] },
   sendIcon: { fontSize: 52, marginBottom: Spacing.base },

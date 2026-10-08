@@ -106,7 +106,7 @@ export default function NegotiationScreen({ navigation, route }) {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.secondary} />
       <SafeAreaView style={styles.safeTop} edges={['top']}>
         <AppHeader
           title="Messages"

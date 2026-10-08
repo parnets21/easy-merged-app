@@ -21,6 +21,7 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import useAuth from '../hooks/useAuth';
+import { useAppMode } from '../shared/AppModeContext';
 import { theme } from '../utils/theme';
 import AuthStack from './AuthStack';
 import AppStack  from './AppStack';
@@ -62,6 +63,7 @@ function PendingStack() {
 
 export default function RootNavigator() {
   const { token, isApproved, isLoading } = useAuth();
+  const { intent } = useAppMode();
 
   if (isLoading) {
     return (
@@ -77,8 +79,9 @@ export default function RootNavigator() {
   // Logged-in but NOT yet approved → show ApprovalWaiting with real navigation
   if (token && !isApproved) return <PendingStack />;
 
-  // Not logged in → auth flow (Splash → Welcome → Login/Register → OTP → Docs)
-  return <AuthStack />;
+  // Not logged in → auth flow. If the user chose "Wholesaler Register" from the
+  // shared screen, start DIRECTLY on Registration (no Splash/Welcome flash).
+  return <AuthStack initialRouteName={intent === 'register' ? 'Registration' : undefined} />;
 }
 
 const styles = StyleSheet.create({

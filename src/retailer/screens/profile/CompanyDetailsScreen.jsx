@@ -74,7 +74,7 @@ export default function CompanyDetailsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.secondary} />
       <AppHeader
         title="Company Details"
         showBack onBack={() => navigation.goBack()}
@@ -162,7 +162,7 @@ const SectionCard = ({ icon, title, children }) => (
 );
 
 const st = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F2F4F7' },
+  safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { padding: 16, paddingBottom: 30 },
   successBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#E8F8EF', borderRadius: 10, padding: 12, marginBottom: 12 },
   successText: { fontSize: 13, fontWeight: '600', color: '#27AE60' },

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- Brand navy — app-wide status bar color (white icons on navy). -->
+    <color name="brand_navy">#1A2340</color>
 </resources>

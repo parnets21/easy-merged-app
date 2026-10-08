@@ -1,7 +1,10 @@
 <resources>
     <!-- App theme using React Native's built-in Bridge theme - guaranteed to resolve -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="android:statusBarColor">@android:color/black</item>
+        <!-- Navy status bar with white icons/text app-wide. -->
+        <item name="android:statusBarColor">@color/brand_navy</item>
+        <!-- false = light (white) status bar icons/text on the dark navy bar. -->
+        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowBackground">@android:color/white</item>
         <item name="android:textColor">@android:color/black</item>
     </style>
